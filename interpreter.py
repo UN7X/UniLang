@@ -19,7 +19,7 @@ check_and_install_package('ply')
 import ply.lex as lex
 import ply.yacc as yacc
 
-# Reserved words (RWs)
+# Reserved words (RWs) IF YOU CAN SEE THIS, THE SYNC WORKED! :3
 reserved = {
     'print': 'PRINT',
     'if': 'IF',
