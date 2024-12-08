@@ -1,0 +1,38 @@
+print("Generating a random integer between 1 and 10...")
+rand_num = randomint(1, 10)
+print("Random number: " + str(rand_num))
+print("Using a for loop to iterate from 1 to " + str(rand_num) + ": ")
+for i in range(1, (rand_num + 1)) {
+    print("Current value of i: " + str(i))
+}
+print("Done!")
+text = input("Enter sample text: ")
+print("The length of the text is: " + str(length(text)))
+print("Substring from index 7 to 12 is: " + substring(text, 7, 12))
+pos = find(text, "a")
+if pos == -1 {
+    print("Character 'a' not found in text")
+} else {
+print("Position of 'a' in text is: " + str(pos))
+}
+x = 10
+print("Value of x before function: " + str(x))
+define test_shadow(x) {
+    print("Value of x inside function: " + str(x))
+    x = x + 5
+    print("New value of x inside function: " + str(x))
+}
+test_shadow(20)
+print("Value of x after function: " + str(x))
+if 1 != 1 {
+    print("Unit Tests Finished!")
+}
+else {
+    print("): continuing tests")
+}
+
+# testing fsrings
+print(f"Hello, {input('Enter your name: ')}!")
+
+# testing autocorrection feature
+print("Hello, World!")

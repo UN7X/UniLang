@@ -5,6 +5,7 @@ import time
 import difflib
 import random
 import re
+import argparse
 
 def check_and_install_package(package_name):
     try:
@@ -110,7 +111,7 @@ def t_newline(t):
     t.lexer.lineno += len(t.value)
 
 def t_FSTRING(t):
-    r'f\"([^\\\n]|(\\.))*?\"'
+    r'f"(?:\\.|[^"])*"'
     t.value = t.value[2:-1]  # Remove the leading f" and trailing "
     return t
 
@@ -485,14 +486,14 @@ def p_empty(p):
 
 def p_error(p):
     if p:
-        token_value = p.value
+        token_value = str(p.value)
         # Get possible matches - cutoff is set to 0.8, yet to be functional
         suggestions = difflib.get_close_matches(token_value, known_tokens, n=1, cutoff=0.8)
         if suggestions:
             print(f"Syntax error at '{token_value}' on line {p.lineno}. Did you mean '{suggestions[0]}'?")
         else:
             print(f"Syntax error at '{token_value}' on line {p.lineno}")
-        parser.errok()  # Reset error status to continue parsing
+        p.lexer.skip(1)  # continue parsing
     else:
         print("Syntax error at EOF")
 
@@ -630,7 +631,15 @@ def execute(node, context):
         return result
 
     elif isinstance(node, FunctionCall):
-        func = context.get_function(node.name)
+        try:
+            func = context.get_function(node.name)
+        except NameError:
+            suggestions = difflib.get_close_matches(node.name, context.functions.keys(), n=1, cutoff=0.8)
+            if suggestions:
+                print(f"Undefined function '{node.name}'. Did you mean '{suggestions[0]}'?")
+            else:
+                print(f"Undefined function '{node.name}'")
+            return
         args = [execute(arg, context) for arg in node.args]
         if isinstance(func, BuiltInFunction):
             result = func.func(*args)
@@ -744,51 +753,29 @@ def execute(node, context):
         raise TypeError(f"Unknown node type '{type(node).__name__}'")
 
 source_code = '''
-print("Generating a random integer between 1 and 10...")
-rand_num = randomint(1, 10)
-print("Random number: " + str(rand_num))
-print("Using a for loop to iterate from 1 to " + str(rand_num) + ": ")
-for i inn range(1, (rand_num + 1)) {
-    print("Current value of i: " + str(i))
-}
-print("Done!")
-text = input("Enter sample text: ")
-print("The length of the text is: " + str(length(text)))
-print("Substring from index 7 to 12 is: " + substring(text, 7, 12))
-pos = find(text, "a")
-if pos == -1 {
-    print("Character 'a' not found in text")
-} else {
-print("Position of 'a' in text is: " + str(pos))
-}
-x = 10
-print("Value of x before function: " + str(x))
-define test_shadow(x) {
-    print("Value of x inside function: " + str(x))
-    x = x + 5
-    print("New value of x inside function: " + str(x))
-}
-test_shadow(20)
-print("Value of x after function: " + str(x))
-if 1 != 1 {
-    print("Unit Tests Finished!")
-}
-else {
-    print("): continuing tests")
-}
 
-# testing fsrings
-print(f"Hello, {input('Enter your name: ')}!")
-
-# testing autocorrection feature
-prnt("Hello, World!")
 '''
-# Parse the source code
-try:
-    ast = parser.parse(source_code)
-except SyntaxError as e:
-    print(e)
-    exit(1)
+
+if __name__ == '__main__':
+    parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
+    parser_arg.add_argument('script', help='Path to the UniLang script file')
+    parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
+    parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
+    args = parser_arg.parse_args()
+
+    # Read source code from the specified file
+    with open(args.script, 'r') as f:
+        source_code = f.read()
+
+    # Parse the source code
+    try:
+        ast = parser.parse(source_code)
+    except SyntaxError as e:
+        print(e)
+        if args.fc:
+            exit(1)
+        elif args.fo:
+            pass  # Continue execution despite syntax errors
 
 # Create the GE context and define built-in functions from Python that i stole
 global_context = ExecutionContext()
@@ -799,9 +786,8 @@ global_context.define_function('randomint', BuiltInFunction(lambda min_val, max_
 global_context.define_function('length', BuiltInFunction(lambda s: len(str(s))))
 global_context.define_function('substring', BuiltInFunction(lambda s, start, end: str(s)[int(start):int(end)]))
 global_context.define_function('find', BuiltInFunction(lambda s, sub: str(s).find(str(sub))))
-
-
-# Execute everything
+    
+# Execute the parsed AST
 try:
     execute(ast, global_context)
 except Exception as e:
