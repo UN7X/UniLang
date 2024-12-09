@@ -1,6 +1,10 @@
 import subprocess
-import pkg_resources
-from pkg_resources import DistributionNotFound
+try:
+    import pkg_resources
+    from pkg_resources import DistributionNotFound
+except ModuleNotFoundError:
+        print(f"\033[93m[WARNING]Required package: ['Setuptools'] not found. Installing missing package...\033[0m")
+        os.system(f"{sys.executable} -m pip install setuptools")
 import time
 import random
 import re
@@ -10,49 +14,71 @@ import difflib
 import os
 from os import path
 import platform
+import sys
 
-parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
-parser_arg.add_argument('script', nargs="?", help='Path to the UniLang script file')
-parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
-parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
-parser_arg.add_argument('--init', action='store_true', help='Prapare and ensure the interpreter is ready for first use.')
-parser_arg.add_argument('--about', action='store_true', help='Show information about the interpreter.')
+try:
+    parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
+    parser_arg.add_argument('script', nargs="?", help='Path to the UniLang script file')
+    parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
+    parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
+    parser_arg.add_argument('--init', action='store_true', help='Prapare and ensure the interpreter is ready for first use.')
+    parser_arg.add_argument('--about', action='store_true', help='Show information about the interpreter.')
+    parser_arg.add_argument('--version', action='version', version='%(prog)s 1.0.0')
+    parser_arg.add_argument('--man', action='store_true', help='Display ULS syntax and usage information.')
+    parser_arg.add_argument('--debug', action='store_true', help='Enable debug mode.')
 
-args = parser_arg.parse_args()
+    args = parser_arg.parse_args()
+except argparse.ArgumentError as e:
+    print(f"\033[93m[WARNING] {e}\033[0m")
+    exit(1)
 
-if not (args.init or args.about) and not args.script:
-    parser_arg.error("the following arguments are required: script")
-
-def check_and_install_package(package_names):
-    for package_name in package_names:
-        try:
-            pkg_resources.get_distribution(package_name)
-            print(f"{package_name} is already installed.")
-        except DistributionNotFound:
-            print(f"{package_name} not found. Installing...")
-            subprocess.call(['pip', 'install', package_name])
-    return True
-
-if args.init:
-    print("Initializing interpreter...")
-    print("Checking and installing required packages...")
-    check_and_install_package(['ply', 'colorama', 'requests'])
-    
-    if platform.python_implementation() != 'PyPy':
-        print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for better performance.\033[0m")
-    
-    print("Initialization complete.")
 try: 
     import ply.lex as lex
     import ply.yacc as yacc
     from colorama import init, Fore, Style
     init(autoreset=True)
     import requests
-except ImportError:
-    print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
-    exit(1)
+    import sys
+    from tqdm import tqdm
+except ImportError or ModuleNotFoundError:
+    if not args.init:
+        print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
+        exit(1)
+    # Check if setuptools is installed using the os module
+    def is_setuptools_installed():
+        for path in sys.path:
+            if os.path.isdir(os.path.join(path, 'setuptools')):
+                return True
+        return False
 
-if args.about:
+    if not is_setuptools_installed():
+        print("setuptools not found. Installing...")
+        os.system(f"{sys.executable} -m pip install setuptools")
+
+    # Use setuptools to require and install packages
+
+    try:
+        pkg_resources.get_distribution('ply')
+        print("\033[36m[INFO]ply is already installed.\033[0m")
+        pkg_resources.get_distribution('colorama')
+        print("\033[36m[INFO]colorama is already installed.\033[0m")
+        pkg_resources.get_distribution('requests')
+        print("\033[36m[INFO]requests is already installed.\033[0m")
+        pkg_resources.get_distribution('tqdm')
+        print("\033[36m[INFO]tqdm is already installed.\033[0m")
+    except pkg_resources.DistributionNotFound as e:
+        missing_packages = [str(e).split("'")[1]]
+        print(f"\033[93m[WARNING]Required package(s): {missing_packages} not found. Installing missing package(s)...\033[0m")
+
+        for package in missing_packages:
+            subprocess.call([sys.executable, "-m", "pip", "install", package])
+            
+
+
+if not (args.init or args.about) and not args.script:
+    parser_arg.error("the following arguments are required: script")
+
+def about():
     print(f"""
 \033[36mUni\033[97;46mLang \033[107;30mScript\033[0m | Interpreter\033[0m
 by UN7X
@@ -91,12 +117,36 @@ by UN7X
     print("""\n\033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is a simple, interpreted programming language designed for beginners. 
 It is inspired by Python and JavaScript, and aims to be easy to learn and use. 
 The interpreter is written in Python using the PLY library for lexing and parsing. 
+And it also includes built-in functions for common tasks such as input/output, math, and string manipulation. 
 The language supports basic features such as variables, expressions, control structures, functions, and more. 
-The interpreter also includes built-in functions for common tasks such as input/output, math, and string manipulation. 
-The language is designed to be extensible, so additional features and libraries can be added easily. 
+It's designed to be extensible, so additional features and pure-python libraries can be added easily. 
 The goal of \033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is to provide a simple and fun way to learn programming and create small projects.\n""")
-    print("For more info, please visit https://un7x.net/unilang-script")
+    print("For more info, please visit https://un7x.net/unilang-script\n")
     exit(0)
+
+def check_and_install_package(package_names):
+    for package_name in package_names:
+        try:
+            pkg_resources.get_distribution(package_name)
+            print(f"{package_name} is already installed.")
+        except DistributionNotFound:
+            print(f"{package_name} not found. Installing...")
+            subprocess.call(['pip', 'install', package_name])
+    return True
+
+if args.init:    
+    print("\033[36m[INFO] Initializing interpreter...\033[0m")
+    if platform.python_implementation() != 'PyPy':
+        print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for best performance.\033[0m")
+
+    
+
+    
+
+
+if args.about:
+    about()
+
 
 
 # Reserved words (RWs) IF YOU CAN SEE THIS, THE SYNC WORKED! :3
@@ -196,7 +246,7 @@ def t_NUMBER(t):
 def t_NEWLINE(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
-    return t
+
 
 
 
@@ -421,19 +471,8 @@ def p_return_statement(p):
     p[0] = Return(p[2])
 
 def p_expression(p):
-    '''expression : logic_expr
-                  | fstring
-                  | function_call
-    '''
-    if len(p) == 3:
-        if p[2] == '++':
-            p[0] = UnaryOp('increment', p[1])
-        elif p[2] == '--':
-            p[0] = UnaryOp('decrement', p[1])
-    elif len(p) == 4:
-        p[0] = CompoundAssignment(p[1], p[2], p[3])
-    else:
-        p[0] = p[1]
+    '''expression : equality_expr'''
+    p[0] = p[1]
 
 def p_fstring(p):
     'fstring : F_QUOTE fstring_content QUOTE'
@@ -474,26 +513,24 @@ def p_logic_term(p):
         p[0] = p[1]
 
 def p_equality_expr(p):
-    '''equality_expr : equality_expr EQ relational_expr
-                     | equality_expr NEQ relational_expr
-                     | relational_expr
-    '''
-    if len(p) == 4:
-        p[0] = BinaryOp(p[2], p[1], p[3])
-    else:
+    '''equality_expr : relational_expr
+                     | equality_expr EQ relational_expr
+                     | equality_expr NEQ relational_expr'''
+    if len(p) == 2:
         p[0] = p[1]
+    else:
+        p[0] = BinaryOp(p[2], p[1], p[3])
 
 def p_relational_expr(p):
-    '''relational_expr : relational_expr LT additive_expr
-                       | relational_expr LE additive_expr
+    '''relational_expr : additive_expr
+                       | relational_expr LT additive_expr
                        | relational_expr GT additive_expr
-                       | relational_expr GE additive_expr
-                       | additive_expr
-    '''
-    if len(p) == 4:
-        p[0] = BinaryOp(p[2], p[1], p[3])
-    else:
+                       | relational_expr LE additive_expr
+                       | relational_expr GE additive_expr'''
+    if len(p) == 2:
         p[0] = p[1]
+    else:
+        p[0] = BinaryOp(p[2], p[1], p[3])
 
 def p_additive_expr(p):
     '''additive_expr : additive_expr PLUS term
@@ -538,10 +575,8 @@ def p_primary(p):
     elif p[2] == '.':
         p[0] = MemberAccess(p[1], p[3])
     elif p[2] == '(':
-        if len(p) == 4:
-            p[0] = FunctionCall(p[1], [])
-        else:
-            p[0] = FunctionCall(p[1], p[3])
+        args = p[3] if len(p) == 5 else []
+        p[0] = FunctionCall(p[1], args)
 
 def p_atom(p):
     '''atom : IDENTIFIER
@@ -551,15 +586,16 @@ def p_atom(p):
             | FALSE
             | LPAREN expression RPAREN'''
     if len(p) == 2:
-        if p.slice[1].type == 'IDENTIFIER':
+        token_type = p.slice[1].type
+        if token_type == 'IDENTIFIER':
             p[0] = Variable(p[1])
-        elif p.slice[1].type == 'NUMBER':
+        elif token_type == 'NUMBER':
             p[0] = Number(p[1])
-        elif p.slice[1].type == 'STRING':
+        elif token_type == 'STRING':
             p[0] = String(p[1])
-        elif p.slice[1].type == 'TRUE':
+        elif token_type == 'TRUE':
             p[0] = Boolean(True)
-        elif p.slice[1].type == 'FALSE':
+        elif token_type == 'FALSE':
             p[0] = Boolean(False)
     else:
         p[0] = p[2]
@@ -574,22 +610,22 @@ def p_atom(p):
 #         p[0] = []
 
 
-# def p_member_access(p):
-#     '''member_access : DOT IDENTIFIER
-#                      | DOT IDENTIFIER LPAREN arg_list RPAREN
-#                      | DOT IDENTIFIER LPAREN RPAREN'''
-#     if len(p) == 3:
-#         # Field access
-#         def access(obj):
-#             return getattr(obj, p[2])
-#     else:
-#         # Method call
-#         args = p[4] if len(p) == 6 else []
+def p_member_access(p):
+     '''member_access : DOT IDENTIFIER
+                      | DOT IDENTIFIER LPAREN arg_list RPAREN
+                      | DOT IDENTIFIER LPAREN RPAREN'''
+     if len(p) == 3:
+         # Field access
+         def access(obj):
+             return getattr(obj, p[2])
+     else:
+         # Method call
+         args = p[4] if len(p) == 6 else []
 
-#         def access(obj):
-#             method = getattr(obj, p[2])
-#             return method(*args)
-#     p[0] = access
+         def access(obj):
+             method = getattr(obj, p[2])
+             return method(*args)
+     p[0] = access
 
 def p_wait_statement(p):
     'wait_statement : WAIT expression'
@@ -648,22 +684,77 @@ def p_error(p):
     if p:
         token_value = str(p.value)
         suggestions = difflib.get_close_matches(token_value, known_tokens, n=1, cutoff=0.8)
-        error_message = f"[FATAL] Syntax error at '{token_value}' on line {p.lineno}"
+        error_message = f"[ERROR] Syntax error at '{token_value}' on line {p.lineno}"
         if suggestions:
             error_message += f". Did you mean '{suggestions[0]}'?"
         print(Fore.RED + error_message)
         # Do not skip the token, if you do, the world ends.
     else:
-        print(Fore.RED + "[FATAL] Syntax error at EOF")
+        print(Fore.RED + "[ERROR] Syntax error at EOF")
 
 
-if not args.init or args.about:
+if not args.about:
     # build parser, i think
-    parser = yacc.yacc(start='program', debug=True, write_tables=False)
+    try:
+        if args.init:
+            print("\033[36m[INFO] Initializing parser...\033[0m")
+        class ColorStream:
+            def __init__(self, stream, debug=False):
+                self.stream = stream
+                self.debug_mode = debug
+                self.printed_messages = set()
+        
+            def write(self, data):
+                if str(data).startswith("WARNING:"):
+                    #remove the warning prefix, replacing it with our own [WARNING]
+                    data = str(data).replace("WARNING:", "[WARNING]")
+                    self.stream.write(Fore.YELLOW + data + "\033[0m\n")
+                else:
+                    self.stream.write("\033[93m" + data + "\033[0m")
+        
+            def flush(self):
+                self.stream.flush()
 
+            def info(self, message, *args):
+                if not self.debug_mode:
+                    if not hasattr(self, 'printed_messages'):
+                        self.printed_messages = set()
+                    if message not in self.printed_messages and message != "":
+                        self.write("\033[36m[INFO] " + message + "\033[0m\n")
+                        self.printed_messages.add(message)
+                else:
+                    self.write("\033[36m[INFO] " + message + "\033[0m\n")
+                
+
+            def success(self, message, *args):
+                self.write("\033[32m[SUCCESS] " + message + "\033[0m\n")
+
+            def fatal(self, message, *args):
+                self.write(Fore.LIGHTRED_EX + "[FATAL] " + message + "\n")
+
+            def warning(self, message, *args):
+                self.write(Fore.YELLOW + "[WARNING] " + message + "\n")
+
+            def debug(self, message, *args):
+                if self.debug_mode:
+                    self.write("\033[35m[DEBUG] " + message + "\033[0m\n")        
+        parser = yacc.yacc(start='program', debug=True, debuglog=ColorStream(sys.stdout, debug=args.debug))
+        if args.init:
+            print("\033[32m[SUCCESS] Parser initialized.\033[0m")
+    except Exception as e:
+        print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
+        exit(1)
+    if args.init:
+        print("\033[32m[SUCCESS] Initialization complete.\033[0m")
+        about()
 class Import(Node):
     def __init__(self, module_name):
         self.module_name = module_name
+
+class MemberAccess(Node):
+    def __init__(self, obj, member):
+        self.obj = obj
+        self.member = member
 
 class Function:
     def __init__(self, params, body):
@@ -754,7 +845,7 @@ def execute(node, context):
             module = __import__(module_name)
             context.set_variable(module_name, module)
         except ImportError:
-            print(Fore.RED + f"[FATAL] Module '{module_name}' not found")
+            print(Fore.RED + f"[ERROR] Module '{module_name}' not found")
     elif isinstance(node, Block):
         for stmt in node.statements:
             execute(stmt, context)
@@ -935,7 +1026,7 @@ if __name__ == '__main__':
         try:
             ast = parser.parse(source_code)
         except SyntaxError as e:
-            print(Fore.RED + f"[FATAL] {e}")
+            print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
             if args.fc:
                 exit(1)
             elif args.fo:
@@ -958,4 +1049,4 @@ if not (args.init or args.about):
     try:
         execute(ast, global_context)
     except Exception as e:
-        print(Fore.RED + f"[FATAL] {e}")
+        print(Fore.LIGHTRED_EX + f"[FATAL] {e}")

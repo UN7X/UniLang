@@ -1,0 +1,3 @@
+parser.out
+// => [GitIgnoreEntry("*.iml"), GitIgnoreEntry("out/")]
+__pycache__/
