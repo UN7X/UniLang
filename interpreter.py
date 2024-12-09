@@ -116,7 +116,7 @@ tokens = [
     'EQUALS', 'LPAREN', 'RPAREN', 'COMMA',
     'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT',
     'LBRACE', 'RBRACE', 'INCREMENT', 'DECREMENT', 'PLUS_EQUALS', 'MINUS_EQUALS',
-    'AND_OP', 'OR_OP',
+    'AND_OP', 'OR_OP', "NEWLINE", 
 ] + list(reserved.values())
 
 # Regular expression rules for simple tokens
@@ -184,9 +184,10 @@ def t_NUMBER(t):
     return t
 
 # track line numbers
-def t_newline(t):
+def t_NEWLINE(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
+    return t
 
 
 
@@ -290,15 +291,20 @@ class Wait(Node):
 # grandma's granular grammy gramtastic grammar grammathon grammation rules
 
 def p_program(p):
-    'program : statement_list'
-    p[0] = Program(p[1])
+    '''program : statement_list
+               | statement_list NEWLINE'''
+    if len(p) == 2:
+        p[0] = Program(p[1])
+    else:
+        p[0] = Program(p[1])
+
 
 def p_statement_list(p):
-    '''statement_list : statement_list statement
+    '''statement_list : statement_list NEWLINE statement
                       | statement
     '''
-    if len(p) == 3:
-        p[0] = p[1] + [p[2]]
+    if len(p) == 4:
+        p[0] = p[1] + [p[3]]
     else:
         p[0] = [p[1]]
 
@@ -409,10 +415,6 @@ def p_expression(p):
     '''expression : logic_expr
                   | fstring
                   | function_call
-                  | expression INCREMENT
-                  | expression DECREMENT
-                  | IDENTIFIER PLUS_EQUALS expression
-                  | IDENTIFIER MINUS_EQUALS expression
     '''
     if len(p) == 3:
         if p[2] == '++':
@@ -446,7 +448,6 @@ def p_fstring_part(p):
 
 def p_logic_expr(p):
     '''logic_expr : logic_expr OR_OP logic_term
-                  | logic_term OR logic_term
                   | logic_term
     '''
     if len(p) == 4:
@@ -456,7 +457,6 @@ def p_logic_expr(p):
 
 def p_logic_term(p):
     '''logic_term : logic_term AND_OP equality_expr
-                  | logic_term AND equality_expr
                   | equality_expr
     '''
     if len(p) == 4:
@@ -519,13 +519,20 @@ def p_factor(p):
         p[0] = p[1]
 
 def p_primary(p):
-    '''primary : atom member_access_chain
-               | function_call'''
-    obj = p[1]
-
-    for access in p[2]:
-        obj = access(obj)
-    p[0] = obj
+    '''primary : atom
+               | primary DOT IDENTIFIER
+               | primary LPAREN arg_list RPAREN
+               | primary LPAREN RPAREN
+    '''
+    if len(p) == 2:
+        p[0] = p[1]
+    elif p[2] == '.':
+        p[0] = MemberAccess(p[1], p[3])
+    elif p[2] == '(':
+        if len(p) == 4:
+            p[0] = FunctionCall(p[1], [])
+        else:
+            p[0] = FunctionCall(p[1], p[3])
 
 def p_atom(p):
     '''atom : IDENTIFIER
@@ -548,29 +555,32 @@ def p_atom(p):
     else:
         p[0] = p[2]
 
-def p_member_access_chain(p):
-    '''member_access_chain : member_access_chain member_access
-                           | empty'''
-    if len(p) == 3:
-        p[0] = p[1] + [p[2]]
-    else:
-        p[0] = []
 
-def p_member_access(p):
-    '''member_access : DOT IDENTIFIER
-                     | DOT IDENTIFIER LPAREN arg_list RPAREN
-                     | DOT IDENTIFIER LPAREN RPAREN'''
-    if len(p) == 3:
-        # Field access
-        def access(obj):
-            return getattr(obj, p[2])
-    else:
-        # Method call
-        args = p[4] if len(p) == 6 else []
-        def access(obj):
-            method = getattr(obj, p[2])
-            return method(*args)
-    p[0] = access
+# def p_member_access_chain(p):
+#     '''member_access_chain : member_access_chain member_access
+#                            | empty'''
+#     if len(p) == 3:
+#         p[0] = p[1] + [p[2]]
+#     else:
+#         p[0] = []
+
+
+# def p_member_access(p):
+#     '''member_access : DOT IDENTIFIER
+#                      | DOT IDENTIFIER LPAREN arg_list RPAREN
+#                      | DOT IDENTIFIER LPAREN RPAREN'''
+#     if len(p) == 3:
+#         # Field access
+#         def access(obj):
+#             return getattr(obj, p[2])
+#     else:
+#         # Method call
+#         args = p[4] if len(p) == 6 else []
+
+#         def access(obj):
+#             method = getattr(obj, p[2])
+#             return method(*args)
+#     p[0] = access
 
 def p_wait_statement(p):
     'wait_statement : WAIT expression'
@@ -583,20 +593,20 @@ def p_function_call(p):
                      | primary DOT IDENTIFIER LPAREN RPAREN
     '''
     if len(p) == 5:
-        # Simple function call
+        # Simple function call, e.g., func(arg1, arg2)
         args = p[3]
         p[0] = FunctionCall(p[1], args)
     elif len(p) == 4:
-        # Function call with no arguments
+        # Function call with no arguments, e.g., func()
         p[0] = FunctionCall(p[1], [])
     elif len(p) == 6:
-        # Method call with arguments
+        # Method call with arguments, e.g., obj.method(arg1, arg2)
         obj = p[1]
         method_name = p[3]
         args = p[5]
         p[0] = MethodCall(obj, method_name, args)
     else:
-        # Method call with no arguments
+        # Method call with no arguments, e.g., obj.method()
         obj = p[1]
         method_name = p[3]
         p[0] = MethodCall(obj, method_name, [])
@@ -638,9 +648,9 @@ def p_error(p):
         print(Fore.RED + "[FATAL] Syntax error at EOF")
 
 
-
-# build parser, i think
-parser = yacc.yacc(start='program')
+if not args.init or args.about:
+    # build parser, i think
+    parser = yacc.yacc(start='program', debug=True, write_tables=False)
 
 class Import(Node):
     def __init__(self, module_name):
