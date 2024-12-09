@@ -416,9 +416,9 @@ def p_expression(p):
     '''
     if len(p) == 3:
         if p[2] == '++':
-            p[0] = Increment(p[1])
+            p[0] = UnaryOp('increment', p[1])
         elif p[2] == '--':
-            p[0] = Decrement(p[1])
+            p[0] = UnaryOp('decrement', p[1])
     elif len(p) == 4:
         p[0] = CompoundAssignment(p[1], p[2], p[3])
     else:
