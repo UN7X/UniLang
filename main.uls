@@ -1,38 +1,69 @@
-print("Generating a random integer between 1 and 10...")
-rand_num = randomint(1, 10)
-print("Random number: " + str(rand_num))
-print("Using a for loop to iterate from 1 to " + str(rand_num) + ": ")
-for i in range(1, (rand_num + 1)) {
-    print("Current value of i: " + str(i))
-}
-print("Done!")
-text = input("Enter sample text: ")
-print("The length of the text is: " + str(length(text)))
-print("Substring from index 7 to 12 is: " + substring(text, 7, 12))
-pos = find(text, "a")
-if pos == -1 {
-    print("Character 'a' not found in text")
+# Import the math module
+import math
+
+# Test Python library support by using sqrt function
+result = math.sqrt(25)
+print("The square root of 25 is: " + str(result))
+
+# Test ANSI color-coding by printing colored text
+print("\033[31mThis text is red\033[0m")
+print("\033[32mThis text is green\033[0m")
+print("\033[34mThis text is blue\033[0m")
+
+# In-depth testing of if statements
+x = input("Enter a number: ")
+x = int(x)
+
+if x > 0 {
+    print("x is positive")
+    if x % 2 == 0 {
+        print("x is even")
+    } else {
+        print("x is odd")
+    }
 } else {
-print("Position of 'a' in text is: " + str(pos))
-}
-x = 10
-print("Value of x before function: " + str(x))
-define test_shadow(x) {
-    print("Value of x inside function: " + str(x))
-    x = x + 5
-    print("New value of x inside function: " + str(x))
-}
-test_shadow(20)
-print("Value of x after function: " + str(x))
-if 1 != 1 {
-    print("Unit Tests Finished!")
-}
-else {
-    print("): continuing tests")
+    if x == 0 {
+        print("x is zero")
+    } else {
+        print("x is negative")
+    }
 }
 
-# testing fsrings
-print(f"Hello, {input('Enter your name: ')}!")
+# Nested if statements and variable scope testing
+define check_number(n) {
+    if n > 10 {
+        print("n is greater than 10")
+        n_inner = n - 10
+        if n_inner > 5 {
+            print("n_inner is greater than 5")
+        } else {
+            print("n_inner is less than or equal to 5")
+        }
+    } else {
+        print("n is less than or equal to 10")
+    }
+}
 
-# testing autocorrection feature
-print("Hello, World!")
+check_number(x)
+
+# Testing variable shadowing
+y = 50
+print("Value of y before function: " + str(y))
+define test_shadow(y) {
+    print("Value of y inside function before change: " + str(y))
+    y = y + 10
+    print("Value of y inside function after change: " + str(y))
+}
+test_shadow(10)
+print("Value of y after function call: " + str(y))
+
+# Using loops and control structures
+for i in range(1, 6) {
+    print("Loop iteration: " + str(i))
+    if i == 3 {
+        print("i is 3, breaking the loop")
+        break
+    }
+}
+
+print("End of tests")

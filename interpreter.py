@@ -2,23 +2,93 @@ import subprocess
 import pkg_resources
 from pkg_resources import DistributionNotFound
 import time
-import difflib
 import random
 import re
+import math
 import argparse
+import difflib
+import os
+from os import path
+import platform
 
-def check_and_install_package(package_name):
-    try:
-        pkg_resources.get_distribution(package_name)
-        print(f"{package_name} is already installed.")
-    except DistributionNotFound:
-        print(f"{package_name} not found. Installing...")
-        subprocess.call(['pip', 'install', package_name])
+parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
+parser_arg.add_argument('script', nargs="?", help='Path to the UniLang script file')
+parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
+parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
+parser_arg.add_argument('--init', action='store_true', help='Prapare and ensure the interpreter is ready for first use.')
+parser_arg.add_argument('--about', action='store_true', help='Show information about the interpreter.')
 
-# Check and install PLY if necessary
-check_and_install_package('ply')
-import ply.lex as lex
-import ply.yacc as yacc
+args = parser_arg.parse_args()
+
+if not (args.init or args.about) and not args.script:
+    parser_arg.error("the following arguments are required: script")
+
+def check_and_install_package(package_names):
+    for package_name in package_names:
+        try:
+            pkg_resources.get_distribution(package_name)
+            print(f"{package_name} is already installed.")
+        except DistributionNotFound:
+            print(f"{package_name} not found. Installing...")
+            subprocess.call(['pip', 'install', package_name])
+    return True
+
+if args.init:
+    print("Initializing interpreter...")
+    print("Checking and installing required packages...")
+    check_and_install_package(['ply', 'colorama', 'requests'])
+    
+    if platform.python_implementation() != 'PyPy':
+        print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for better performance.\033[0m")
+    
+    print("Initialization complete.")
+try: 
+    import ply.lex as lex
+    import ply.yacc as yacc
+    from colorama import init, Fore, Style
+    init(autoreset=True)
+    import requests
+except ImportError:
+    print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
+    exit(1)
+
+if args.about:
+    print(f"""
+\033[36mUni\033[97;46mLang \033[107;30mScript\033[0m | Interpreter\033[0m
+by UN7X
+      ___           ___       ___      
+     /\__\         /\__\     /\  \     
+    /:/  /        /:/  /    /::\  \    
+   /:/  /        /:/  /    /:/\ \  \   
+  /:/  /  ___   /:/  /    _\:\~\ \  \  
+ /:/__/  /\__\ /:/__/    /\ \:\ \ \__\ 
+ \:\  \ /:/  / \:\  \    \:\ \:\ \/__/ 
+  \:\  /:/  /   \:\  \    \:\ \:\__\   
+   \:\/:/  /     \:\  \    \:\/:/  /   
+    \::/  /       \:\__\    \::/  /    
+     \/__/         \/__/     \/__/     \n
+""")
+    labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Python Version:", "Type:"]
+    values = [
+        time.strftime('%Y-%m-%d %H:%M:%S'),
+        str(requests.get('https://google.com').status_code == 200),
+        os.path.abspath(__file__),
+        "1.0.0",
+        platform.system(),
+        platform.version(),
+        platform.machine(),
+        platform.processor(),
+        platform.python_version(),
+        platform.python_implementation()
+    ]
+    
+    max_label_width = max(len(label) for label in labels)
+    max_value_width = max(len(value) for value in values)
+    
+    for label, value in zip(labels, values):
+        print(f"{label:<{max_label_width}} {value:<{max_value_width}}")
+
+
 
 # Reserved words (RWs) IF YOU CAN SEE THIS, THE SYNC WORKED! :3
 reserved = {
@@ -37,11 +107,12 @@ reserved = {
     'range': 'RANGE',
     'true': 'TRUE',
     'false': 'FALSE',
+    'import': 'IMPORT'
 }
 # token names list including RWs
 tokens = [
     'NUMBER', 'STRING', 'IDENTIFIER',
-    'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
+    'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD', 
     'EQUALS', 'LPAREN', 'RPAREN', 'COMMA',
     'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT',
     'LBRACE', 'RBRACE', 'INCREMENT', 'DECREMENT', 'PLUS_EQUALS', 'MINUS_EQUALS',
@@ -49,6 +120,7 @@ tokens = [
 ] + list(reserved.values())
 
 # Regular expression rules for simple tokens
+t_IMPORT = r'import'
 t_PLUS     = r'\+'
 t_MINUS    = r'-'
 t_TIMES    = r'\*'
@@ -73,6 +145,12 @@ t_MINUS_EQUALS = r'-='
 t_AND_OP = r'&&'
 t_OR_OP = r'\|\|'
 t_DOT = r'\.'
+tokens.extend(['F_QUOTE', 'QUOTE', 'STRING_CONTENT'])
+
+t_F_QUOTE = r'f"'
+t_QUOTE = r'"'
+t_STRING_CONTENT = r'[^{}"]+'
+
 
 # List of operator symbols
 operator_symbols = [
@@ -110,12 +188,7 @@ def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
 
-def t_FSTRING(t):
-    r'f"(?:\\.|[^"])*"'
-    t.value = t.value[2:-1]  # Remove the leading f" and trailing "
-    return t
 
-tokens.append('FSTRING')
 
 
 # error handling; im too lazy to write a proper error message
@@ -123,17 +196,16 @@ tokens.append('FSTRING')
 # that would be cool
 
 def t_error(t):
-    raise SyntaxError(f"Illegal character '{t.value[0]}' at line {t.lexer.lineno}")
+    print(Fore.YELLOW + f"[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
+    t.lexer.skip(1)
 
 # build lexer; kill me
 lexer = lex.lex()
 
 # pre rules for operators
 precedence = (
-    ('left', 'OR_OP'),
-    ('left', 'AND_OP'),
-    ('left', 'OR'),
-    ('left', 'AND'),
+    ('left', 'OR_OP', 'OR'),
+    ('left', 'AND_OP' , 'AND'),
     ('nonassoc', 'EQ', 'NEQ'),
     ('nonassoc', 'LT', 'LE', 'GT', 'GE'),
     ('left', 'PLUS', 'MINUS'),
@@ -294,13 +366,11 @@ def p_iterable(p):
                 | RANGE LPAREN expression COMMA expression RPAREN
     '''
     if len(p) == 2:
-        p[0] = p[1]
+        p[0] = execute(p[1], ExecutionContext())
     else:
-        p[0] = RangeExpression(p[3], p[5])
-
-def p_expression_fstring(p):
-    'expression : FSTRING'
-    p[0] = FString(p[1])
+        start = execute(p[3], ExecutionContext())
+        end = execute(p[5], ExecutionContext())
+        p[0] = range(start, end)
 
 def p_while_statement(p):
     'while_statement : WHILE expression block'
@@ -327,16 +397,56 @@ def p_param_list(p):
     else:
         p[0] = []
 
+def p_import_statement(p):
+    'statement : IMPORT IDENTIFIER'
+    p[0] = Import(p[2])  # You'll need to define an Import node class
+
 def p_return_statement(p):
     'return_statement : RESULT expression'
     p[0] = Return(p[2])
 
 def p_expression(p):
-    'expression : logic_expr'
-    p[0] = p[1]
+    '''expression : logic_expr
+                  | fstring
+                  | function_call
+                  | expression INCREMENT
+                  | expression DECREMENT
+                  | IDENTIFIER PLUS_EQUALS expression
+                  | IDENTIFIER MINUS_EQUALS expression
+    '''
+    if len(p) == 3:
+        if p[2] == '++':
+            p[0] = Increment(p[1])
+        elif p[2] == '--':
+            p[0] = Decrement(p[1])
+    elif len(p) == 4:
+        p[0] = CompoundAssignment(p[1], p[2], p[3])
+    else:
+        p[0] = p[1]
+
+def p_fstring(p):
+    'fstring : F_QUOTE fstring_content QUOTE'
+    p[0] = FString(p[2])
+
+def p_fstring_content(p):
+    '''fstring_content : fstring_content fstring_part
+                       | fstring_part'''
+    if len(p) == 3:
+        p[0] = p[1] + [p[2]]
+    else:
+        p[0] = [p[1]]
+
+def p_fstring_part(p):
+    '''fstring_part : STRING_CONTENT
+                    | LBRACE expression RBRACE'''
+    if len(p) == 2:
+        p[0] = ('string', p[1])
+    else:
+        p[0] = ('expr', p[2])
 
 def p_logic_expr(p):
     '''logic_expr : logic_expr OR_OP logic_term
+                  | logic_term OR logic_term
                   | logic_term
     '''
     if len(p) == 4:
@@ -346,6 +456,7 @@ def p_logic_expr(p):
 
 def p_logic_term(p):
     '''logic_term : logic_term AND_OP equality_expr
+                  | logic_term AND equality_expr
                   | equality_expr
     '''
     if len(p) == 4:
@@ -408,57 +519,87 @@ def p_factor(p):
         p[0] = p[1]
 
 def p_primary(p):
-    '''primary : primary DOT IDENTIFIER
-               | primary DOT IDENTIFIER LPAREN arg_list RPAREN
-               | function_call
-               | TRUE
-               | FALSE
-               | NUMBER
-               | STRING
-               | IDENTIFIER
-               | LPAREN expression RPAREN
-    '''
-    if len(p) == 4 and p.slice[2].type == 'DOT':
-        # primary : primary DOT IDENTIFIER
-        p[0] = MethodCall(p[1], p[3], [])
-    elif len(p) == 7 and p.slice[2].type == 'DOT':
-        # primary : primary DOT IDENTIFIER LPAREN arg_list RPAREN
-        p[0] = MethodCall(p[1], p[3], p[5])
-    elif len(p) == 2:
-        # single element on the right-hand side  handloing
-        if p.slice[1].type == 'function_call':
-            p[0] = p[1]
-        elif p.slice[1].type == 'TRUE':
-            p[0] = Boolean(True)
-        elif p.slice[1].type == 'FALSE':
-            p[0] = Boolean(False)
+    '''primary : atom member_access_chain
+               | function_call'''
+    obj = p[1]
+
+    for access in p[2]:
+        obj = access(obj)
+    p[0] = obj
+
+def p_atom(p):
+    '''atom : IDENTIFIER
+            | NUMBER
+            | STRING
+            | TRUE
+            | FALSE
+            | LPAREN expression RPAREN'''
+    if len(p) == 2:
+        if p.slice[1].type == 'IDENTIFIER':
+            p[0] = Variable(p[1])
         elif p.slice[1].type == 'NUMBER':
             p[0] = Number(p[1])
         elif p.slice[1].type == 'STRING':
             p[0] = String(p[1])
-        elif p.slice[1].type == 'IDENTIFIER':
-            p[0] = Variable(p[1])
-        else:
-            raise SyntaxError(f"Unexpected token '{p.slice[1].type}' in primary")
-    elif len(p) == 4 and p.slice[1].type == 'LPAREN':
-        # primary : LPAREN expression RPAREN
-        p[0] = p[2]
+        elif p.slice[1].type == 'TRUE':
+            p[0] = Boolean(True)
+        elif p.slice[1].type == 'FALSE':
+            p[0] = Boolean(False)
     else:
-        raise SyntaxError(f"Invalid primary expression at '{p.slice[1].type}'")
+        p[0] = p[2]
 
+def p_member_access_chain(p):
+    '''member_access_chain : member_access_chain member_access
+                           | empty'''
+    if len(p) == 3:
+        p[0] = p[1] + [p[2]]
+    else:
+        p[0] = []
+
+def p_member_access(p):
+    '''member_access : DOT IDENTIFIER
+                     | DOT IDENTIFIER LPAREN arg_list RPAREN
+                     | DOT IDENTIFIER LPAREN RPAREN'''
+    if len(p) == 3:
+        # Field access
+        def access(obj):
+            return getattr(obj, p[2])
+    else:
+        # Method call
+        args = p[4] if len(p) == 6 else []
+        def access(obj):
+            method = getattr(obj, p[2])
+            return method(*args)
+    p[0] = access
 
 def p_wait_statement(p):
     'wait_statement : WAIT expression'
     p[0] = Wait(p[2])
 
 def p_function_call(p):
-    '''function_call : IDENTIFIER LPAREN RPAREN
-                     | IDENTIFIER LPAREN arg_list RPAREN
+    '''function_call : IDENTIFIER LPAREN arg_list RPAREN
+                     | IDENTIFIER LPAREN RPAREN
+                     | primary DOT IDENTIFIER LPAREN arg_list RPAREN
+                     | primary DOT IDENTIFIER LPAREN RPAREN
     '''
-    if len(p) == 4:
+    if len(p) == 5:
+        # Simple function call
+        args = p[3]
+        p[0] = FunctionCall(p[1], args)
+    elif len(p) == 4:
+        # Function call with no arguments
         p[0] = FunctionCall(p[1], [])
+    elif len(p) == 6:
+        # Method call with arguments
+        obj = p[1]
+        method_name = p[3]
+        args = p[5]
+        p[0] = MethodCall(obj, method_name, args)
     else:
-        p[0] = FunctionCall(p[1], p[3])
+        # Method call with no arguments
+        obj = p[1]
+        method_name = p[3]
+        p[0] = MethodCall(obj, method_name, [])
 
 def p_arg_list(p):
     '''arg_list : expression
@@ -487,20 +628,23 @@ def p_empty(p):
 def p_error(p):
     if p:
         token_value = str(p.value)
-        # Get possible matches - cutoff is set to 0.8, yet to be functional
         suggestions = difflib.get_close_matches(token_value, known_tokens, n=1, cutoff=0.8)
+        error_message = f"[FATAL] Syntax error at '{token_value}' on line {p.lineno}"
         if suggestions:
-            print(f"Syntax error at '{token_value}' on line {p.lineno}. Did you mean '{suggestions[0]}'?")
-        else:
-            print(f"Syntax error at '{token_value}' on line {p.lineno}")
-        p.lexer.skip(1)  # continue parsing
+            error_message += f". Did you mean '{suggestions[0]}'?"
+        print(Fore.RED + error_message)
+        # Do not skip the token, if you do, the world ends.
     else:
-        print("Syntax error at EOF")
+        print(Fore.RED + "[FATAL] Syntax error at EOF")
 
 
 
 # build parser, i think
 parser = yacc.yacc(start='program')
+
+class Import(Node):
+    def __init__(self, module_name):
+        self.module_name = module_name
 
 class Function:
     def __init__(self, params, body):
@@ -553,8 +697,8 @@ class MethodCall(Node):
         self.args = args
 
 class FString(Node):
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, parts):
+        self.parts = parts
 
 class BuiltInFunction(Function):
     def __init__(self, func):
@@ -580,9 +724,18 @@ class RangeExpression(Node):
         self.end = end
 
 def execute(node, context):
+    if node is None:
+        return None
     if isinstance(node, Program):
         for stmt in node.statements:
             execute(stmt, context)
+    elif isinstance(node, Import):
+        module_name = node.module_name
+        try:
+            module = __import__(module_name)
+            context.set_variable(module_name, module)
+        except ImportError:
+            print(Fore.RED + f"[FATAL] Module '{module_name}' not found")
     elif isinstance(node, Block):
         for stmt in node.statements:
             execute(stmt, context)
@@ -618,16 +771,12 @@ def execute(node, context):
         func = Function(node.params, node.body)
         context.define_function(node.name, func)
     elif isinstance(node, FString):
-        # regex expression finder (within curly thingys)
-        pattern = r'\{([^}]+)\}'
-        parts = re.split(pattern, node.value)
         result = ''
-        for i, part in enumerate(parts):
-            if i % 2 == 0:
-                result += part
-            else:
-                expr = parser.parse(part, lexer=lexer)
-                result += str(execute(expr, context))
+        for part in node.parts:
+            if part[0] == 'string':
+                result += part[1]
+            elif part[0] == 'expr':
+                result += str(execute(part[1], context))
         return result
 
     elif isinstance(node, FunctionCall):
@@ -636,9 +785,9 @@ def execute(node, context):
         except NameError:
             suggestions = difflib.get_close_matches(node.name, context.functions.keys(), n=1, cutoff=0.8)
             if suggestions:
-                print(f"Undefined function '{node.name}'. Did you mean '{suggestions[0]}'?")
+                print(Fore.YELLOW + f"[WARNING] Undefined function '{node.name}'. Did you mean '{suggestions[0]}'?")
             else:
-                print(f"Undefined function '{node.name}'")
+                print(Fore.YELLOW + f"[WARNING] Undefined function '{node.name}'")
             return
         args = [execute(arg, context) for arg in node.args]
         if isinstance(func, BuiltInFunction):
@@ -757,25 +906,21 @@ source_code = '''
 '''
 
 if __name__ == '__main__':
-    parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
-    parser_arg.add_argument('script', help='Path to the UniLang script file')
-    parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
-    parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
-    args = parser_arg.parse_args()
 
-    # Read source code from the specified file
-    with open(args.script, 'r') as f:
-        source_code = f.read()
+    if not (args.init or args.about):
+        # Read source code from the specified file
+        with open(args.script, 'r') as f:
+            source_code = f.read()
 
-    # Parse the source code
-    try:
-        ast = parser.parse(source_code)
-    except SyntaxError as e:
-        print(e)
-        if args.fc:
-            exit(1)
-        elif args.fo:
-            pass  # Continue execution despite syntax errors
+        # Parse the source code
+        try:
+            ast = parser.parse(source_code)
+        except SyntaxError as e:
+            print(Fore.RED + f"[FATAL] {e}")
+            if args.fc:
+                exit(1)
+            elif args.fo:
+                pass  # Continue execution despite syntax errors
 
 # Create the GE context and define built-in functions from Python that i stole
 global_context = ExecutionContext()
@@ -786,9 +931,12 @@ global_context.define_function('randomint', BuiltInFunction(lambda min_val, max_
 global_context.define_function('length', BuiltInFunction(lambda s: len(str(s))))
 global_context.define_function('substring', BuiltInFunction(lambda s, start, end: str(s)[int(start):int(end)]))
 global_context.define_function('find', BuiltInFunction(lambda s, sub: str(s).find(str(sub))))
-    
-# Execute the parsed AST
-try:
-    execute(ast, global_context)
-except Exception as e:
-    print(e)
+global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(x)))
+global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
+
+if not (args.init or args.about):
+    # Execute the parsed AST
+    try:
+        execute(ast, global_context)
+    except Exception as e:
+        print(Fore.RED + f"[FATAL] {e}")
