@@ -44,7 +44,6 @@ except ImportError or ModuleNotFoundError:
     if not args.init:
         print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
         exit(1)
-    # Check if setuptools is installed using the os module
     def is_setuptools_installed():
         for path in sys.path:
             if os.path.isdir(os.path.join(path, 'setuptools')):
@@ -55,7 +54,6 @@ except ImportError or ModuleNotFoundError:
         print("setuptools not found. Installing...")
         os.system(f"{sys.executable} -m pip install setuptools")
 
-    # Use setuptools to require and install packages
 
     try:
         pkg_resources.get_distribution('ply')
@@ -464,7 +462,7 @@ def p_param_list(p):
 
 def p_import_statement(p):
     'statement : IMPORT IDENTIFIER'
-    p[0] = Import(p[2])  # You'll need to define an Import node class
+    p[0] = Import(p[2])  # IMPOTANT: define an Import node class thingy LATER, but DONT FORGET TO DO IT
 
 def p_return_statement(p):
     'return_statement : RESULT expression'
@@ -615,7 +613,7 @@ def p_member_access(p):
                       | DOT IDENTIFIER LPAREN arg_list RPAREN
                       | DOT IDENTIFIER LPAREN RPAREN'''
      if len(p) == 3:
-         # Field access
+         # Field access | i dunno either, ask the youtube tutorial guy
          def access(obj):
              return getattr(obj, p[2])
      else:
@@ -638,20 +636,20 @@ def p_function_call(p):
                      | primary DOT IDENTIFIER LPAREN RPAREN
     '''
     if len(p) == 5:
-        # Simple function call, e.g., func(arg1, arg2)
+        # Simple function call, e.g: func(arg1, arg2)
         args = p[3]
         p[0] = FunctionCall(p[1], args)
     elif len(p) == 4:
-        # Function call with no arguments, e.g., func()
+        # Function call with no arguments, e.g: func()
         p[0] = FunctionCall(p[1], [])
     elif len(p) == 6:
-        # Method call with arguments, e.g., obj.method(arg1, arg2)
+        # Method call with arguments, e.g: obj.method(arg1, arg2)
         obj = p[1]
         method_name = p[3]
         args = p[5]
         p[0] = MethodCall(obj, method_name, args)
     else:
-        # Method call with no arguments, e.g., obj.method()
+        # Method call with no arguments, e.g: obj.method()
         obj = p[1]
         method_name = p[3]
         p[0] = MethodCall(obj, method_name, [])
@@ -970,7 +968,6 @@ def execute(node, context):
         operand = execute(node.operand, context)
         if node.op == 'increment':
             result = operand + 1
-            # Assuming node.operand is a variable node
             context.set_variable(node.operand.name, result)
             return result
         elif node.op == 'decrement':
@@ -1018,7 +1015,6 @@ source_code = '''
 if __name__ == '__main__':
 
     if not (args.init or args.about):
-        # Read source code from the specified file
         with open(args.script, 'r') as f:
             source_code = f.read()
 
