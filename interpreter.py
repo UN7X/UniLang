@@ -68,7 +68,7 @@ by UN7X
     \::/  /       \:\__\    \::/  /    
      \/__/         \/__/     \/__/     \n
 """)
-    labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Python Version:", "Type:"]
+    labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Architecture:", "Python Version:", "Type:",]
     values = [
         time.strftime('%Y-%m-%d %H:%M:%S'),
         str(requests.get('https://google.com').status_code == 200),
@@ -78,6 +78,7 @@ by UN7X
         platform.version(),
         platform.machine(),
         platform.processor(),
+        str(platform.architecture()).replace("('", "").replace("', '", ": ").replace("')", ""),
         platform.python_version(),
         platform.python_implementation()
     ]
@@ -87,7 +88,15 @@ by UN7X
     
     for label, value in zip(labels, values):
         print(f"{label:<{max_label_width}} {value:<{max_value_width}}")
-
+    print("""\n\033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is a simple, interpreted programming language designed for beginners. 
+It is inspired by Python and JavaScript, and aims to be easy to learn and use. 
+The interpreter is written in Python using the PLY library for lexing and parsing. 
+The language supports basic features such as variables, expressions, control structures, functions, and more. 
+The interpreter also includes built-in functions for common tasks such as input/output, math, and string manipulation. 
+The language is designed to be extensible, so additional features and libraries can be added easily. 
+The goal of \033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is to provide a simple and fun way to learn programming and create small projects.\n""")
+    print("For more info, please visit https://un7x.net/unilang-script")
+    exit(0)
 
 
 # Reserved words (RWs) IF YOU CAN SEE THIS, THE SYNC WORKED! :3
