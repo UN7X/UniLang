@@ -24,13 +24,85 @@ try:
     parser_arg.add_argument('--init', action='store_true', help='Prapare and ensure the interpreter is ready for first use.')
     parser_arg.add_argument('--about', action='store_true', help='Show information about the interpreter.')
     parser_arg.add_argument('--version', action='version', version='%(prog)s 1.0.0')
-    parser_arg.add_argument('--man', action='store_true', help='Display ULS syntax and usage information.')
+    parser_arg.add_argument('--man', nargs='?', const='1', help='Show the ULS manual. Provide a page number optionally.')
     parser_arg.add_argument('--debug', action='store_true', help='Enable debug mode.')
 
     args = parser_arg.parse_args()
 except argparse.ArgumentError as e:
     print(f"\033[93m[WARNING] {e}\033[0m")
     exit(1)
+
+manual_pages = [
+    # Page 1
+    """UniLang Script (ULS) Manual - Page 1
+====================================
+Welcome to ULS! 
+Use --man <page> to navigate specific pages.
+Topics:
+ - Basic Syntax
+ - Variables
+ - Built-in Functions
+ - Control Structures
+
+Example:
+pypy interpreter_beta.py --man 2""",
+
+    # Page 2
+    """UniLang Script (ULS) Manual - Page 2
+====================================
+Basic Syntax:
+ULS uses braces { } to denote code blocks.
+
+Example:
+if x > 10 {
+    print("x is greater than 10")
+} else {
+    print("x is less than or equal to 10")
+}
+
+Use --man 3 to see more.""",
+
+    # Page 3
+    """UniLang Script (ULS) Manual - Page 3
+====================================
+Control Structures:
+- if/else statements
+- for loops: for i in range(1, 5) { ... }
+- while loops: while condition { ... }
+
+Built-in Functions:
+- str(), int(), float(), abs(), round()
+- randomint(), length(), substring(), split(), join()
+- sqrt(), http_get()
+
+Use --man 4 for more.""",
+
+    # Page 4
+    """UniLang Script (ULS) Manual - Page 4
+====================================
+Functions:
+define greet(name) {
+    print("Hello, " + str(name) + "!")
+}
+
+Call with: greet("Friend")
+
+That's all the pages. Use --man with a different number to revisit them.
+"""
+]
+
+
+if args.man:
+    try:
+        page_number = int(args.man)
+    except ValueError:
+        page_number = 1
+    page_index = page_number - 1
+    if 0 <= page_index < len(manual_pages):
+        print(manual_pages[page_index])
+    else:
+        print(f"No manual page {page_number}. Available pages: 1-{len(manual_pages)}")
+    sys.exit(0)
 
 try: 
     import ply.lex as lex
@@ -39,16 +111,12 @@ try:
     init(autoreset=True)
     import requests
     import sys
-    from tqdm import tqdm
 except ImportError or ModuleNotFoundError:
     if not args.init:
         print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
         exit(1)
     def is_setuptools_installed():
-        for path in sys.path:
-            if os.path.isdir(os.path.join(path, 'setuptools')):
-                return True
-        return False
+        return any(os.path.isdir(os.path.join(path, 'setuptools')) for path in sys.path)
 
     if not is_setuptools_installed():
         print("setuptools not found. Installing...")
@@ -73,7 +141,7 @@ except ImportError or ModuleNotFoundError:
             
 
 
-if not (args.init or args.about) and not args.script:
+if not args.init and not args.about and not args.script:
     parser_arg.error("the following arguments are required: script")
 
 def about():
@@ -204,7 +272,6 @@ t_ignore = ' \t'
 
 def t_COMMENT(t):
     r'\#.*'
-    pass
 
 def t_IDENTIFIER(t):
     r'[a-zA-Z_]\w*'
@@ -226,10 +293,19 @@ def t_newline(t):
     t.lexer.lineno += len(t.value)
 
 def t_error(t):
-    print(Fore.YELLOW + f"[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
+    print(f"{Fore.YELLOW}[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
     t.lexer.skip(1)
 
-lexer = lex.lex()
+if not args.about:
+    try:
+        if args.init:
+            print("\033[36m[INFO] Initializing lexer...\033[0m")
+        lexer = lex.lex()
+        if args.init:
+            print("\033[32m[SUCCESS] Lexer initialized.\033[0m")
+    except Exception as e:
+        print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
+        exit(1)
 
 # ---------------- NODES -----------------
 class Node: pass
@@ -408,10 +484,7 @@ def p_program(p):
 def p_statement_list(p):
     '''statement_list : statement_list statement
                       | statement'''
-    if len(p) == 3:
-        p[0] = p[1] + [p[2]]
-    else:
-        p[0] = [p[1]]
+    p[0] = p[1] + [p[2]] if len(p) == 3 else [p[1]]
 
 def p_statement(p):
     '''statement : assignment
@@ -426,18 +499,12 @@ def p_statement(p):
                  | expression_statement
                  | import_statement
                  | BREAK'''
-    if p.slice[1].type == 'BREAK':
-        p[0] = Break()
-    else:
-        p[0] = p[1]
+    p[0] = Break() if p.slice[1].type == 'BREAK' else p[1]
 
 def p_block(p):
     '''block : LBRACE statement_list RBRACE
              | LBRACE RBRACE'''
-    if len(p) == 4:
-        p[0] = Block(p[2])
-    else:
-        p[0] = Block([])
+    p[0] = Block(p[2]) if len(p) == 4 else Block([])
 
 def p_expression_statement(p):
     '''expression_statement : expression'''
@@ -454,10 +521,7 @@ def p_print_statement(p):
 def p_if_statement(p):
     '''if_statement : IF expression block
                     | IF expression block ELSE block'''
-    if len(p) == 4:
-        p[0] = If(p[2], p[3])
-    else:
-        p[0] = If(p[2], p[3], p[5])
+    p[0] = If(p[2], p[3]) if len(p) == 4 else If(p[2], p[3], p[5])
 
 def p_for_loop(p):
     '''for_loop : FOR IDENTIFIER IN iterable block'''
@@ -466,10 +530,7 @@ def p_for_loop(p):
 def p_iterable(p):
     '''iterable : expression
                 | RANGE LPAREN expression COMMA expression RPAREN'''
-    if len(p) == 2:
-        p[0] = p[1]
-    else:
-        p[0] = RangeExpression(p[3], p[5])
+    p[0] = p[1] if len(p) == 2 else RangeExpression(p[3], p[5])
 
 def p_while_statement(p):
     '''while_statement : WHILE expression block'''
@@ -513,27 +574,18 @@ def p_expression(p):
 def p_logic_or_expr(p):
     '''logic_or_expr : logic_or_expr OR logic_and_expr
                      | logic_and_expr'''
-    if len(p) == 4:
-        p[0] = BinaryOp('or', p[1], p[3])
-    else:
-        p[0] = p[1]
+    p[0] = BinaryOp('or', p[1], p[3]) if len(p) == 4 else p[1]
 
 def p_logic_and_expr(p):
     '''logic_and_expr : logic_and_expr AND equality_expr
                       | equality_expr'''
-    if len(p) == 4:
-        p[0] = BinaryOp('and', p[1], p[3])
-    else:
-        p[0] = p[1]
+    p[0] = BinaryOp('and', p[1], p[3]) if len(p) == 4 else p[1]
 
 def p_equality_expr(p):
     '''equality_expr : relational_expr
                      | equality_expr EQ relational_expr
                      | equality_expr NEQ relational_expr'''
-    if len(p) == 2:
-        p[0] = p[1]
-    else:
-        p[0] = BinaryOp(p[2], p[1], p[3])
+    p[0] = p[1] if len(p) == 2 else BinaryOp(p[2], p[1], p[3])
 
 def p_relational_expr(p):
     '''relational_expr : additive_expr
@@ -541,39 +593,27 @@ def p_relational_expr(p):
                        | relational_expr GT additive_expr
                        | relational_expr LE additive_expr
                        | relational_expr GE additive_expr'''
-    if len(p) == 2:
-        p[0] = p[1]
-    else:
-        p[0] = BinaryOp(p[2], p[1], p[3])
+    p[0] = p[1] if len(p) == 2 else BinaryOp(p[2], p[1], p[3])
 
 def p_additive_expr(p):
     '''additive_expr : additive_expr PLUS term
                      | additive_expr MINUS term
                      | term'''
-    if len(p) == 4:
-        p[0] = BinaryOp(p[2], p[1], p[3])
-    else:
-        p[0] = p[1]
+    p[0] = BinaryOp(p[2], p[1], p[3]) if len(p) == 4 else p[1]
 
 def p_term(p):
     '''term : term TIMES factor
             | term DIVIDE factor
             | term MOD factor
             | factor'''
-    if len(p) == 4:
-        p[0] = BinaryOp(p[2], p[1], p[3])
-    else:
-        p[0] = p[1]
+    p[0] = BinaryOp(p[2], p[1], p[3]) if len(p) == 4 else p[1]
 
 def p_factor(p):
     '''factor : PLUS factor
               | MINUS factor %prec UMINUS
               | NOT factor
               | primary'''
-    if len(p) == 3:
-        p[0] = UnaryOp(p[1], p[2])
-    else:
-        p[0] = p[1]
+    p[0] = UnaryOp(p[1], p[2]) if len(p) == 3 else p[1]
 
 def p_primary(p):
     '''primary : atom
@@ -665,7 +705,7 @@ def p_error(p):
             error_message += f". Did you mean '{suggestions[0]}'?"
         print(Fore.RED + error_message)
     else:
-        print(Fore.RED + "[ERROR] Syntax error at EOF")
+        print(f"{Fore.RED}[ERROR] Syntax error at EOF")
 
 if not args.about:
     # build parser, i think
@@ -704,15 +744,15 @@ if not args.about:
                 self.write("\033[32m[SUCCESS] " + message + "\033[0m\n")
 
             def fatal(self, message, *args):
-                self.write(Fore.LIGHTRED_EX + "[FATAL] " + message + "\n")
+                self.write(f"{Fore.LIGHTRED_EX}[FATAL] {message}" + "\n")
 
             def warning(self, message, *args):
-                self.write(Fore.YELLOW + "[WARNING] " + message + "\n")
+                self.write(f"{Fore.YELLOW}[WARNING] {message}" + "\n")
 
             def debug(self, message, *args):
                 if self.debug_mode:
                     self.write("\033[35m[DEBUG] " + message + "\033[0m\n")        
-        parser = yacc.yacc(start='program', debug=True, debuglog=ColorStream(sys.stdout, debug=args.debug))
+        parser = yacc.yacc(start='program', debug=True, debuglog=ColorStream(sys.stdout, debug=args.debug), write_tables=True, optimize=True)
         if args.init:
             print("\033[32m[SUCCESS] Parser initialized.\033[0m")
     except Exception as e:
@@ -720,9 +760,16 @@ if not args.about:
         exit(1)
     if args.init:
         print("\033[32m[SUCCESS] Initialization complete.\033[0m")
-        about()
+        exit(0)
 
 # ---------------- EXECUTION -----------------
+class ReturnException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+from colorama import Fore
+import math, time, random, requests
+
 class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
@@ -730,179 +777,221 @@ class ReturnException(Exception):
 def execute(node, context):
     if node is None:
         return None
-    if isinstance(node, Program):
-        for stmt in node.statements:
-            val = execute(stmt, context)
-            if isinstance(stmt, Break):
-                break
-    elif isinstance(node, Import):
-        module_name = node.module_name
-        try:
-            module = __import__(module_name)
-            context.set_variable(module_name, module)
-        except ImportError:
-            print(Fore.RED + f"[ERROR] Module '{module_name}' not found")
-    elif isinstance(node, Block):
-        for stmt in node.statements:
-            val = execute(stmt, context)
-            if val == 'break':
-                return 'break'
-        return None
-    elif isinstance(node, Number):
-        return node.value
-    elif isinstance(node, String):
-        return node.value
-    elif isinstance(node, Variable):
-        return context.get_variable(node.name)
-    elif isinstance(node, Assignment):
-        value = execute(node.value, context)
-        context.set_variable(node.name, value)
-    elif isinstance(node, Print):
-        value = execute(node.expression, context)
-        print(value)
-    elif isinstance(node, Wait):
-        duration = execute(node.duration, context)
-        time.sleep(duration)
-    elif isinstance(node, Boolean):
-        return node.value
-    elif isinstance(node, If):
-        condition = execute(node.condition, context)
-        if condition:
-            return execute(node.then_branch, context)
-        elif node.else_branch:
-            return execute(node.else_branch, context)
-    elif isinstance(node, FunctionDef):
-        func = Function(node.params, node.body)
-        context.define_function(node.name, func)
-    elif isinstance(node, FunctionCall):
-        # node.name might be a Variable or something else
-        func_name = node.name.name if isinstance(node.name, Variable) else node.name
-        func = context.get_function(func_name)
-        args = [execute(arg, context) for arg in node.args]
-        if isinstance(func, BuiltInFunction):
-            return func.func(*args)
-        elif isinstance(func, Function):
-            if len(func.params) != len(args):
-                raise TypeError(f"Function '{func_name}' expected {len(func.params)} arguments, got {len(args)}")
-            func_context = ExecutionContext(parent=context)
-            for param, arg in zip(func.params, args):
-                func_context.set_variable(param, arg)
-            try:
-                execute(func.body, func_context)
-            except ReturnException as e:
-                return e.value
-            return func_context.return_value
-        else:
-            raise TypeError(f"'{func_name}' is not a function")
-    elif isinstance(node, Return):
-        value = execute(node.value, context)
-        raise ReturnException(value)
-    elif isinstance(node, MethodCall):
-        obj = execute(node.obj, context)
-        args = [execute(arg, context) for arg in node.args]
-
-        # Check if the object has the requested attribute
-        if hasattr(obj, node.method_name):
-            method = getattr(obj, node.method_name)
-            if callable(method):
-                return method(*args)
-            else:
-                raise TypeError(f"Attribute '{node.method_name}' of object '{type(obj).__name__}' is not callable")
-        else:
-            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{node.method_name}'")
-    elif isinstance(node, BinaryOp):
-        left = execute(node.left, context)
-        right = execute(node.right, context)
-        ops = {
-            '+': lambda l,r: l+r,
-            '-': lambda l,r: l-r,
-            '*': lambda l,r: l*r,
-            '/': lambda l,r: l/r,
-            '%': lambda l,r: l%r,
-            '<': lambda l,r: l<r,
-            '>': lambda l,r: l>r,
-            '<=': lambda l,r: l<=r,
-            '>=': lambda l,r: l>=r,
-            '==': lambda l,r: l==r,
-            '!=': lambda l,r: l!=r,
-            'and': lambda l,r: l and r,
-            'or': lambda l,r: l or r
-        }
-        return ops[node.op](left, right)
-    elif isinstance(node, UnaryOp):
-        operand = execute(node.operand, context)
-        if node.op == 'increment':
-            if not isinstance(node.operand, Variable):
-                raise TypeError("Increment target must be a variable")
-            result = operand + 1
-            context.set_variable(node.operand.name, result)
-            return result
-        elif node.op == 'decrement':
-            if not isinstance(node.operand, Variable):
-                raise TypeError("Decrement target must be a variable")
-            result = operand - 1
-            context.set_variable(node.operand.name, result)
-            return result
-        elif node.op == 'not':
-            return not operand
-        elif node.op == '-':
-            return -operand
-        else:
-            raise ValueError(f"Unknown unary operator '{node.op}'")
-    elif isinstance(node, CompoundAssignment):
-        value = context.get_variable(node.name)
-        right = execute(node.value, context)
-        if node.op == '+':
-            result = value + right
-        else:
-            result = value - right
-        context.set_variable(node.name, result)
-        return result
-    elif isinstance(node, ForLoop):
-        iterable = execute(node.iterable, context)
-        if not hasattr(iterable, '__iter__'):
-            raise TypeError(f"'{type(iterable).__name__}' object is not iterable")
-        for item in iterable:
-            loop_context = ExecutionContext(parent=context)
-            loop_context.set_variable(node.var_name, item)
-            val = execute(node.body, loop_context)
-            if val == 'break':
-                break
-
-    elif isinstance(node, While):
-        while execute(node.condition, context):
-            val = execute(node.body, context)
-            if val == 'break':
-                break
-            if context.return_value is not None:
-                break
-
-    elif isinstance(node, RangeExpression):
-        start = execute(node.start, context)
-        end = execute(node.end, context)
-        return range(start, end)
-    elif isinstance(node, Break):
-        # Just return something to indicate break
-        return 'break'
+    if handler := NODE_HANDLERS.get(type(node)):
+        return handler(node, context)
     else:
         raise TypeError(f"Unknown node type '{type(node).__name__}'")
 
-source_code = ''
-if __name__ == '__main__':
+def handle_program(node, context):
+    for stmt in node.statements:
+        val = execute(stmt, context)
+        # If a break is encountered at top-level, it just stops executing further statements
+        if val == 'break':
+            break
+    return None
 
-    if not (args.init or args.about):
-        with open(args.script, 'r') as f:
-            source_code = f.read()
+def handle_import(node, context):
+    module_name = node.module_name
+    try:
+        module = __import__(module_name)
+        context.set_variable(module_name, module)
+    except ImportError:
+        print(f"{Fore.RED}[ERROR] Module '{module_name}' not found")
 
-        # Parse the source code
+def handle_block(node, context):
+    for stmt in node.statements:
+        val = execute(stmt, context)
+        if val == 'break':
+            return 'break'
+    return None
+
+def handle_number(node, context):
+    return node.value
+
+def handle_string(node, context):
+    return node.value
+
+def handle_variable(node, context):
+    return context.get_variable(node.name)
+
+def handle_assignment(node, context):
+    value = execute(node.value, context)
+    context.set_variable(node.name, value)
+
+def handle_print(node, context):
+    value = execute(node.expression, context)
+    print(value)
+
+def handle_wait(node, context):
+    duration = execute(node.duration, context)
+    time.sleep(duration)
+
+def handle_boolean(node, context):
+    return node.value
+
+def handle_if(node, context):
+    if condition := execute(node.condition, context):
+        return execute(node.then_branch, context)
+    elif node.else_branch:
+        return execute(node.else_branch, context)
+    return None
+
+def handle_function_def(node, context):
+    func = Function(node.params, node.body)
+    context.define_function(node.name, func)
+
+def handle_function_call(node, context):
+    func_name = node.name.name if hasattr(node.name, 'name') else node.name
+    func = context.get_function(func_name)
+    args = [execute(arg, context) for arg in node.args]
+
+    if isinstance(func, BuiltInFunction):
+        return func.func(*args)
+    elif isinstance(func, Function):
+        if len(func.params) != len(args):
+            raise TypeError(f"Function '{func_name}' expected {len(func.params)} arguments, got {len(args)}")
+        func_context = ExecutionContext(parent=context)
+        for param, arg in zip(func.params, args):
+            func_context.set_variable(param, arg)
         try:
-            ast = parser.parse(source_code)
-        except SyntaxError as e:
-            print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
-            if args.fc:
-                exit(1)
-            elif args.fo:
-                pass  # Continue execution despite syntax errors
+            execute(func.body, func_context)
+        except ReturnException as e:
+            return e.value
+        return func_context.return_value
+    else:
+        raise TypeError(f"'{func_name}' is not a function")
+
+def handle_return(node, context):
+    value = execute(node.value, context)
+    raise ReturnException(value)
+
+def handle_method_call(node, context):
+    obj = execute(node.obj, context)
+    args = [execute(arg, context) for arg in node.args]
+
+    if not hasattr(obj, node.method_name):
+        raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{node.method_name}'")
+    method = getattr(obj, node.method_name)
+    if callable(method):
+        return method(*args)
+    else:
+        raise TypeError(f"Attribute '{node.method_name}' of object '{type(obj).__name__}' is not callable")
+
+def handle_binary_op(node, context):
+    left = execute(node.left, context)
+    right = execute(node.right, context)
+    ops = {
+        '+': lambda l,r: l+r,
+        '-': lambda l,r: l-r,
+        '*': lambda l,r: l*r,
+        '/': lambda l,r: l/r,
+        '%': lambda l,r: l%r,
+        '<': lambda l,r: l<r,
+        '>': lambda l,r: l>r,
+        '<=': lambda l,r: l<=r,
+        '>=': lambda l,r: l>=r,
+        '==': lambda l,r: l==r,
+        '!=': lambda l,r: l!=r,
+        'and': lambda l,r: l and r,
+        'or': lambda l,r: l or r
+    }
+    return ops[node.op](left, right)
+
+def handle_unary_op(node, context):
+    operand = execute(node.operand, context)
+    if node.op == 'increment':
+        if not isinstance(node.operand, Variable):
+            raise TypeError("Increment target must be a variable")
+        result = operand + 1
+        context.set_variable(node.operand.name, result)
+        return result
+    elif node.op == 'decrement':
+        if not isinstance(node.operand, Variable):
+            raise TypeError("Decrement target must be a variable")
+        result = operand - 1
+        context.set_variable(node.operand.name, result)
+        return result
+    elif node.op == 'not':
+        return not operand
+    elif node.op == '-':
+        return -operand
+    else:
+        raise ValueError(f"Unknown unary operator '{node.op}'")
+
+def handle_compound_assignment(node, context):
+    value = context.get_variable(node.name)
+    right = execute(node.value, context)
+    result = value + right if node.op == '+' else value - right
+    context.set_variable(node.name, result)
+    return result
+
+def handle_for_loop(node, context):
+    iterable = execute(node.iterable, context)
+    if not hasattr(iterable, '__iter__'):
+        raise TypeError(f"'{type(iterable).__name__}' object is not iterable")
+    for item in iterable:
+        loop_context = ExecutionContext(parent=context)
+        loop_context.set_variable(node.var_name, item)
+        val = execute(node.body, loop_context)
+        if val == 'break':
+            break
+
+def handle_while(node, context):
+    while execute(node.condition, context):
+        val = execute(node.body, context)
+        if val == 'break':
+            break
+        if context.return_value is not None:
+            break
+
+def handle_range_expression(node, context):
+    start = execute(node.start, context)
+    end = execute(node.end, context)
+    return range(start, end)
+
+def handle_break(node, context):
+    return 'break'
+
+# Map node types to handlers
+NODE_HANDLERS = {}
+
+# Register handlers
+NODE_HANDLERS[Program] = handle_program
+NODE_HANDLERS[Import] = handle_import
+NODE_HANDLERS[Block] = handle_block
+NODE_HANDLERS[Number] = handle_number
+NODE_HANDLERS[String] = handle_string
+NODE_HANDLERS[Variable] = handle_variable
+NODE_HANDLERS[Assignment] = handle_assignment
+NODE_HANDLERS[Print] = handle_print
+NODE_HANDLERS[Wait] = handle_wait
+NODE_HANDLERS[Boolean] = handle_boolean
+NODE_HANDLERS[If] = handle_if
+NODE_HANDLERS[FunctionDef] = handle_function_def
+NODE_HANDLERS[FunctionCall] = handle_function_call
+NODE_HANDLERS[Return] = handle_return
+NODE_HANDLERS[MethodCall] = handle_method_call
+NODE_HANDLERS[BinaryOp] = handle_binary_op
+NODE_HANDLERS[UnaryOp] = handle_unary_op
+NODE_HANDLERS[CompoundAssignment] = handle_compound_assignment
+NODE_HANDLERS[ForLoop] = handle_for_loop
+NODE_HANDLERS[While] = handle_while
+NODE_HANDLERS[RangeExpression] = handle_range_expression
+NODE_HANDLERS[Break] = handle_break
+
+source_code = ''
+if __name__ == '__main__' and not args.init and not args.about:
+    with open(args.script, 'r') as f:
+        source_code = f.read()
+
+    # Parse the source code
+    try:
+        ast = parser.parse(source_code)
+    except SyntaxError as e:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] {e}")
+        if args.fc:
+            exit(1)
+
 
 global_context = ExecutionContext()
 global_context.define_function('str', BuiltInFunction(str))
@@ -938,4 +1027,4 @@ if not (args.init or args.about):
     try:
         execute(ast, global_context)
     except Exception as e:
-        print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
+        print(f"{Fore.LIGHTRED_EX}[FATAL] {e}")
