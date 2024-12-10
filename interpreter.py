@@ -26,6 +26,7 @@ try:
     parser_arg.add_argument('--version', action='version', version='%(prog)s 1.0.0')
     parser_arg.add_argument('--man', nargs='?', const='1', help='Show the ULS manual. Provide a page number optionally.')
     parser_arg.add_argument('--debug', action='store_true', help='Enable debug mode.')
+    parser_arg.add_argument('--check', action='store_true', help='Check for updates.')  
 
     args = parser_arg.parse_args()
 except argparse.ArgumentError as e:
@@ -289,7 +290,7 @@ except ImportError or ModuleNotFoundError:
             
 
 
-if not args.init and not args.about and not args.script:
+if not args.init and not args.about and not args.script and not args.check:
     parser_arg.error("the following arguments are required: script")
 
 current_version = "1.1.3"
@@ -343,29 +344,29 @@ def check_and_install_package(package_names):
             print(f"{package_name} not found. Installing...")
             subprocess.call(['pip', 'install', package_name])
     return True
-
-if args.init:    
-    print("\033[36m[INFO] Initializing interpreter...\033[0m")
-    if platform.python_implementation() != 'PyPy':
-        print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for best performance.\033[0m")
-
-    
-
 GITHUB_API_URL = 'https://api.github.com/repos/UN7X/unilang/releases/latest'
 
 def check_for_updates():
     try:
         response = requests.get(GITHUB_API_URL)
-        latest_release = response.json()['tag_name']
+        latest_release = response.json()['name']
         if current_version < latest_release:
             print(f"\033[93m[WARNING] A newer version ({latest_release}) is available. Please update for best stability.\033[0m")
+        else:
+            print("\033[92m[INFO] You are using the latest version.\033[0m")
     except Exception as e:
-        print("\033[91m[ERROR] Could not check for updates.\033[0m", e)
+        print("\033[91m[ERROR] Could not check for updates.\033[0m", e)    
 
-check_for_updates()
+if bool(requests.get('https://google.com').status_code == 200) and args.check:
+    check_for_updates()
+
+if args.init:  
+    check_for_updates()
+    print("\033[36m[INFO] Initializing interpreter...\033[0m")
+    if platform.python_implementation() != 'PyPy':
+        print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for best performance.\033[0m")
+
     
-
-
 if args.about:
     about()
 
@@ -1135,7 +1136,7 @@ NODE_HANDLERS[RangeExpression] = handle_range_expression
 NODE_HANDLERS[Break] = handle_break
 
 source_code = ''
-if __name__ == '__main__' and not args.init and not args.about:
+if __name__ == '__main__' and not args.init and not args.about and not args.check:
     with open(args.script, 'r') as f:
         source_code = f.read()
 
@@ -1177,7 +1178,7 @@ global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float
 global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
 
 
-if not (args.init or args.about):
+if not (args.init or args.about or args.check):
     # Execute the parsed AST
     try:
         execute(ast, global_context)
