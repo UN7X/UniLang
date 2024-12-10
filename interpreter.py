@@ -304,10 +304,9 @@ if not args.about:
         if args.init:
             print("\033[32m[SUCCESS] Lexer initialized.\033[0m")
     except Exception as e:
-        print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
+        print(f"{Fore.LIGHTRED_EX}[FATAL] {e}")
         exit(1)
 
-# ---------------- NODES -----------------
 class Node: pass
 
 class Program(Node):
@@ -759,7 +758,7 @@ if not args.about:
         print(Fore.LIGHTRED_EX + f"[FATAL] {e}")
         exit(1)
     if args.init:
-        print("\033[32m[SUCCESS] Initialization complete.\033[0m")
+        print("\033[32m[SUCCESS] Interpreter initialization complete!\033[0m")
         exit(0)
 
 # ---------------- EXECUTION -----------------
