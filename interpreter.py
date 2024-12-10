@@ -36,58 +36,206 @@ manual_pages = [
     # Page 1
     """UniLang Script (ULS) Manual - Page 1
 ====================================
-Welcome to ULS! 
-Use --man <page> to navigate specific pages.
+Welcome to UniLang Script!
+
+UniLang Script (ULS) is a simple, interpreted programming language designed for beginners. It is inspired by Python and JavaScript, aiming to be easy to learn and use.
+
+Use the command line argument '--man <page>' to navigate to specific pages of this manual.
+
 Topics:
+ - Getting Started
  - Basic Syntax
- - Variables
- - Built-in Functions
+ - Variables and Data Types
+ - Operators
  - Control Structures
+ - Functions
+ - Built-in Functions
 
 Example:
-pypy interpreter_beta.py --man 2""",
+pypy interpreter.py --man 2""",
 
     # Page 2
     """UniLang Script (ULS) Manual - Page 2
 ====================================
+Getting Started:
+
+To run a UniLang Script file, use the interpreter followed by the script filename:
+
+Example:
+pypy interpreter.py my_script.uls
+
+Scripts should have the '.uls' extension.
+
+Use '--man 3' to continue to Basic Syntax.""",
+
+    # Page 3
+    """UniLang Script (ULS) Manual - Page 3
+====================================
 Basic Syntax:
-ULS uses braces { } to denote code blocks.
+
+- Statements end with a newline.
+- Use braces { } to denote blocks of code.
+- Comments start with '#' and continue to the end of the line.
+
+Example:
+# This is a comment
+print("Hello, World!")
+
+Use '--man 4' to learn about Variables and Data Types.""",
+
+    # Page 4
+    """UniLang Script (ULS) Manual - Page 4
+====================================
+Variables and Data Types:
+
+Variables are used to store information. You can assign a value to a variable using the '=' operator.
+
+Example:
+x = 10
+name = "Alice"
+is_active = true
+
+Data Types:
+- Numbers: integers (e.g., 10, -5)
+- Strings: text enclosed in double quotes (e.g., "Hello")
+- Booleans: true or false
+
+Use '--man 5' to learn about Operators.""",
+
+    # Page 5
+    """UniLang Script (ULS) Manual - Page 5
+====================================
+Operators:
+
+Arithmetic Operators:
+- Addition: +
+- Subtraction: -
+- Multiplication: *
+- Division: /
+- Modulo: %
+
+Comparison Operators:
+- Equal to: ==
+- Not equal to: !=
+- Greater than: >
+- Less than: <
+- Greater than or equal to: >=
+- Less than or equal to: <=
+
+Logical Operators:
+- And: and
+- Or: or
+- Not: not
+
+Example:
+if (x > 0) and (x < 10) {
+    print("x is between 1 and 9")
+}
+
+Use '--man 6' to learn about Control Structures.""",
+
+    # Page 6
+    """UniLang Script (ULS) Manual - Page 6
+====================================
+Control Structures:
+
+If/Else Statements:
+if condition {
+    # code to execute if condition is true
+} else {
+    # code to execute if condition is false
+}
 
 Example:
 if x > 10 {
     print("x is greater than 10")
 } else {
-    print("x is less than or equal to 10")
+    print("x is 10 or less")
 }
 
-Use --man 3 to see more.""",
+While Loops:
+while condition {
+    # code to execute while condition is true
+}
 
-    # Page 3
-    """UniLang Script (ULS) Manual - Page 3
-====================================
-Control Structures:
-- if/else statements
-- for loops: for i in range(1, 5) { ... }
-- while loops: while condition { ... }
+Example:
+i = 0
+while i < 5 {
+    print(i)
+    i = i + 1
+}
 
-Built-in Functions:
-- str(), int(), float(), abs(), round()
-- randomint(), length(), substring(), split(), join()
-- sqrt(), http_get()
+For Loops:
+for variable in range(start, end) {
+    # code to execute for each value
+}
 
-Use --man 4 for more.""",
+Example:
+for i in range(1, 5) {
+    print(i)
+}
 
-    # Page 4
-    """UniLang Script (ULS) Manual - Page 4
+Use '--man 7' to learn about Functions.""",
+
+    # Page 7
+    """UniLang Script (ULS) Manual - Page 7
 ====================================
 Functions:
-define greet(name) {
-    print("Hello, " + str(name) + "!")
+
+Functions are blocks of reusable code that perform a specific task. You can define a function using the 'define' keyword.
+
+Syntax:
+define function_name(parameters) {
+    # code to execute
+    return value
 }
 
-Call with: greet("Friend")
+Example:
+define greet(name) {
+    return "Hello, " + name + "!"
+}
 
-That's all the pages. Use --man with a different number to revisit them.
+Call the function:
+message = greet("Alice")
+print(message)
+
+Use '--man 8' to learn about Built-in Functions.""",
+
+    # Page 8
+    """UniLang Script (ULS) Manual - Page 8
+====================================
+Built-in Functions:
+
+UniLang provides several built-in functions to perform common tasks.
+
+- print(value): Display the value to the console.
+- input(prompt): Get input from the user.
+- str(value): Convert value to a string.
+- int(value): Convert value to an integer.
+- length(value): Get the length of a string.
+- randomint(min, max): Generate a random integer between min and max.
+- sqrt(value): Calculate the square root of a number.
+
+Example:
+name = input("Enter your name: ")
+print("Hello, " + name + "!")
+rand_num = randomint(1, 100)
+print("Random number between 1 and 100: " + str(rand_num))
+
+Use '--man 9' to see additional resources.""",
+
+    # Page 9
+    """UniLang Script (ULS) Manual - Page 9
+====================================
+Additional Resources:
+
+For more examples and detailed documentation, please visit:
+
+https://un7x.net/unilang-script
+
+Thank you for using UniLang Script!
+
+That's all for the manual. Use '--man <page>' to revisit any section.
 """
 ]
 
@@ -144,28 +292,24 @@ except ImportError or ModuleNotFoundError:
 if not args.init and not args.about and not args.script:
     parser_arg.error("the following arguments are required: script")
 
+current_version = "1.1.3"
+
 def about():
     print(f"""
-\033[36mUni\033[97;46mLang \033[107;30mScript\033[0m | Interpreter\033[0m
+\033[36mUni\033[97;46mLang\033[0m | \033[107;30mScript Interpreter\033[0m
 by UN7X
-      ___           ___       ___      
-     /\__\         /\__\     /\  \     
-    /:/  /        /:/  /    /::\  \    
-   /:/  /        /:/  /    /:/\ \  \   
-  /:/  /  ___   /:/  /    _\:\~\ \  \  
- /:/__/  /\__\ /:/__/    /\ \:\ \ \__\ 
- \:\  \ /:/  / \:\  \    \:\ \:\ \/__/ 
-  \:\  /:/  /   \:\  \    \:\ \:\__\   
-   \:\/:/  /     \:\  \    \:\/:/  /   
-    \::/  /       \:\__\    \::/  /    
-     \/__/         \/__/     \/__/     \n
+ __  __     __         ______     __    
+/\ \/\ \   /\ \       /\  ___\   /\ \   
+\ \ \_\ \  \ \ \____  \ \___  \  \ \ \  
+ \ \_____\  \ \_____\  \/\_____\  \ \_\ 
+  \/_____/   \/_____/   \/_____/   \/_/ 
 """)
     labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Architecture:", "Python Version:", "Type:",]
     values = [
         time.strftime('%Y-%m-%d %H:%M:%S'),
         str(requests.get('https://google.com').status_code == 200),
         os.path.abspath(__file__),
-        "1.0.0",
+        current_version,
         platform.system(),
         platform.version(),
         platform.machine(),
@@ -180,13 +324,13 @@ by UN7X
     
     for label, value in zip(labels, values):
         print(f"{label:<{max_label_width}} {value:<{max_value_width}}")
-    print("""\n\033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is a simple, interpreted programming language designed for beginners. 
+    print("""\n\033[36mUni\033[97;46mLang\033[0m is a simple, interpreted programming language designed for beginners. 
 It is inspired by Python and JavaScript, and aims to be easy to learn and use. 
 The interpreter is written in Python using the PLY library for lexing and parsing. 
 And it also includes built-in functions for common tasks such as input/output, math, and string manipulation. 
 The language supports basic features such as variables, expressions, control structures, functions, and more. 
 It's designed to be extensible, so additional features and pure-python libraries can be added easily. 
-The goal of \033[36mUni\033[97;46mLang \033[107;30mScript\033[0m is to provide a simple and fun way to learn programming and create small projects.\n""")
+The goal of \033[36mUni\033[97;46mLang\033[0m is to provide a simple and fun way to learn programming and create small projects.\n""")
     print("For more info, please visit https://un7x.net/unilang-script\n")
     exit(0)
 
@@ -207,6 +351,18 @@ if args.init:
 
     
 
+GITHUB_API_URL = 'https://api.github.com/repos/UN7X/unilang/releases/latest'
+
+def check_for_updates():
+    try:
+        response = requests.get(GITHUB_API_URL)
+        latest_release = response.json()['tag_name']
+        if current_version < latest_release:
+            print(f"\033[93m[WARNING] A newer version ({latest_release}) is available. Please update for best stability.\033[0m")
+    except Exception as e:
+        print("\033[91m[ERROR] Could not check for updates.\033[0m", e)
+
+check_for_updates()
     
 
 
