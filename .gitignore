@@ -1,3 +1,4 @@
 parser.out
 // => [GitIgnoreEntry("*.iml"), GitIgnoreEntry("out/")]
 __pycache__/
+deprecated_interpreter.py

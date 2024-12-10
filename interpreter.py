@@ -145,9 +145,8 @@ if args.init:
 if args.about:
     about()
 
+# ---------------- LEXER -----------------
 
-
-# Reserved words (RWs) IF YOU CAN SEE THIS, THE SYNC WORKED! :3
 reserved = {
     'print': 'PRINT',
     'if': 'IF',
@@ -155,29 +154,30 @@ reserved = {
     'while': 'WHILE',
     'define': 'DEFINE',
     'result': 'RESULT',
-    'and': 'AND',
-    'or': 'OR',
     'not': 'NOT',
     'wait': 'WAIT',
     'for': 'FOR',
     'in': 'IN',
+    'or': 'OR',
+    'and': 'AND',
     'range': 'RANGE',
     'true': 'TRUE',
     'false': 'FALSE',
-    'import': 'IMPORT'
+    'import': 'IMPORT',
+    'break': 'BREAK'
 }
-# token names list including RWs
+
 tokens = [
     'NUMBER', 'STRING', 'IDENTIFIER',
-    'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD', 
+    'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQUALS', 'LPAREN', 'RPAREN', 'COMMA',
     'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT',
     'LBRACE', 'RBRACE', 'INCREMENT', 'DECREMENT', 'PLUS_EQUALS', 'MINUS_EQUALS',
-    'AND_OP', 'OR_OP', "NEWLINE", 
 ] + list(reserved.values())
 
-# Regular expression rules for simple tokens
-t_IMPORT = r'import'
+t_DOT = r'\.'
+
+
 t_PLUS     = r'\+'
 t_MINUS    = r'-'
 t_TIMES    = r'\*'
@@ -199,40 +199,21 @@ t_INCREMENT = r'\+\+'
 t_DECREMENT = r'--'
 t_PLUS_EQUALS = r'\+='
 t_MINUS_EQUALS = r'-='
-t_AND_OP = r'&&'
-t_OR_OP = r'\|\|'
-t_DOT = r'\.'
-tokens.extend(['F_QUOTE', 'QUOTE', 'STRING_CONTENT'])
-
-t_F_QUOTE = r'f"'
-t_QUOTE = r'"'
-t_STRING_CONTENT = r'[^{}"]+'
-
-
-# List of operator symbols
-operator_symbols = [
-    '+', '-', '*', '/', '%', '=', '==', '!=', '<', '>', '<=', '>=',
-    '(', ')', '{', '}', ',', '.', '&&', '||', '!', '++', '--', '+=', '-='
-]
-
-# Known tokens for error correction
-known_tokens = list(reserved.keys()) + operator_symbols
 
 t_ignore = ' \t'
 
-def t_IDENTIFIER(t):
-    r'[a-zA-Z_]\w*'
-    t.type = reserved.get(t.value, 'IDENTIFIER')  # reserved words dectector
-    return t
-
-# Ignore comments starting with #
 def t_COMMENT(t):
     r'\#.*'
-    pass  # comment remover 9000 (tm) (r) (c) (patent pending)
+    pass
+
+def t_IDENTIFIER(t):
+    r'[a-zA-Z_]\w*'
+    t.type = reserved.get(t.value, 'IDENTIFIER')
+    return t
 
 def t_STRING(t):
     r'\"([^\\\n]|(\\.))*?\"'
-    t.value = t.value[1:-1]  # Remove quotation marks
+    t.value = t.value[1:-1]
     return t
 
 def t_NUMBER(t):
@@ -240,40 +221,18 @@ def t_NUMBER(t):
     t.value = int(t.value)
     return t
 
-# track line numbers
-def t_NEWLINE(t):
+def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
-
-
-
-
-
-# error handling; im too lazy to write a proper error message
-# wait i just got a genius idea, what if the small errors, like mispellings and similar, were fixed by the interpreter itself?
-# that would be cool
 
 def t_error(t):
     print(Fore.YELLOW + f"[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
     t.lexer.skip(1)
 
-# build lexer; kill me
 lexer = lex.lex()
 
-# pre rules for operators
-precedence = (
-    ('left', 'OR_OP', 'OR'),
-    ('left', 'AND_OP' , 'AND'),
-    ('nonassoc', 'EQ', 'NEQ'),
-    ('nonassoc', 'LT', 'LE', 'GT', 'GE'),
-    ('left', 'PLUS', 'MINUS'),
-    ('left', 'TIMES', 'DIVIDE', 'MOD'),
-    ('right', 'NOT', 'UMINUS'),
-)
-
-# AST node class thingies
-class Node:
-    pass
+# ---------------- NODES -----------------
+class Node: pass
 
 class Program(Node):
     def __init__(self, statements):
@@ -345,23 +304,112 @@ class Wait(Node):
     def __init__(self, duration):
         self.duration = duration
 
-# grandma's granular grammy gramtastic grammar grammathon grammation rules
+class Import(Node):
+    def __init__(self, module_name):
+        self.module_name = module_name
+
+class MemberAccess(Node):
+    def __init__(self, obj, member):
+        self.obj = obj
+        self.member = member
+
+class CompoundAssignment(Node):
+    def __init__(self, name, op, value):
+        self.name = name
+        self.op = op
+        self.value = value
+
+class MethodCall(Node):
+    def __init__(self, obj, method_name, args):
+        self.obj = obj
+        self.method_name = method_name
+        self.args = args
+
+class Boolean(Node):
+    def __init__(self, value):
+        self.value = value
+
+class ForLoop(Node):
+    def __init__(self, var_name, iterable, body):
+        self.var_name = var_name
+        self.iterable = iterable
+        self.body = body
+
+class RangeExpression(Node):
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+class Break(Node):
+    pass
+
+class Function:
+    def __init__(self, params, body):
+        self.params = params
+        self.body = body
+
+class ExecutionContext:
+    def __init__(self, parent=None):
+        self.variables = {}
+        self.functions = {} if parent is None else parent.functions
+        self.parent = parent
+        self.return_value = None
+
+    def get_variable(self, name):
+        if name in self.variables:
+            return self.variables[name]
+        elif self.parent:
+            return self.parent.get_variable(name)
+        else:
+            raise NameError(f"Undefined variable '{name}'")
+
+    def set_variable(self, name, value):
+        if name in self.variables or self.parent is None:
+            self.variables[name] = value
+        else:
+            self.parent.set_variable(name, value)
+
+    def define_function(self, name, function):
+        self.functions[name] = function
+
+    def get_function(self, name):
+        if name in self.functions:
+            return self.functions[name]
+        elif self.parent:
+            return self.parent.get_function(name)
+        else:
+            raise NameError(f"Undefined function '{name}'")
+
+class BuiltInFunction(Function):
+    def __init__(self, func):
+        self.func = func
+
+class ReturnException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+# Precedence to handle unary minus
+precedence = (
+    ('left', 'OR'),
+    ('left', 'AND'),
+    ('nonassoc', 'EQ', 'NEQ'),
+    ('nonassoc', 'LT', 'LE', 'GT', 'GE'),
+    ('left', 'PLUS', 'MINUS'),
+    ('left', 'TIMES', 'DIVIDE', 'MOD'),
+    ('right', 'NOT', 'UMINUS'),
+)
+
+# ---------------- GRAMMAR -----------------
 
 def p_program(p):
-    '''program : statement_list
-               | statement_list NEWLINE'''
-    if len(p) == 2:
-        p[0] = Program(p[1])
-    else:
-        p[0] = Program(p[1])
-
+    '''program : statement_list'''
+    p[0] = Program(p[1])
 
 def p_statement_list(p):
-    '''statement_list : statement_list NEWLINE statement
-                      | statement
-    '''
-    if len(p) == 4:
-        p[0] = p[1] + [p[3]]
+    '''statement_list : statement_list statement
+                      | statement'''
+    if len(p) == 3:
+        p[0] = p[1] + [p[2]]
     else:
         p[0] = [p[1]]
 
@@ -376,73 +424,60 @@ def p_statement(p):
                  | wait_statement
                  | block
                  | expression_statement
-    '''
-    p[0] = p[1]
+                 | import_statement
+                 | BREAK'''
+    if p.slice[1].type == 'BREAK':
+        p[0] = Break()
+    else:
+        p[0] = p[1]
+
+def p_block(p):
+    '''block : LBRACE statement_list RBRACE
+             | LBRACE RBRACE'''
+    if len(p) == 4:
+        p[0] = Block(p[2])
+    else:
+        p[0] = Block([])
 
 def p_expression_statement(p):
-    'expression_statement : expression'
+    '''expression_statement : expression'''
     p[0] = p[1]
 
-def p_expression_increment(p):
-    '''expression : expression INCREMENT
-                  | expression DECREMENT
-    '''
-    if p[2] == '++':
-        p[0] = UnaryOp('increment', p[1])
-    elif p[2] == '--':
-        p[0] = UnaryOp('decrement', p[1])
-
-def p_expression_compound_assignment(p):
-    '''expression : IDENTIFIER PLUS_EQUALS expression
-                  | IDENTIFIER MINUS_EQUALS expression
-    '''
-    if p[2] == '+=':
-        p[0] = CompoundAssignment(p[1], '+', p[3])
-    elif p[2] == '-=':
-        p[0] = CompoundAssignment(p[1], '-', p[3])
-
-
 def p_assignment(p):
-    'assignment : IDENTIFIER EQUALS expression'
+    '''assignment : IDENTIFIER EQUALS expression'''
     p[0] = Assignment(p[1], p[3])
 
 def p_print_statement(p):
-    'print_statement : PRINT LPAREN expression RPAREN'
+    '''print_statement : PRINT LPAREN expression RPAREN'''
     p[0] = Print(p[3])
 
 def p_if_statement(p):
-    '''
-    if_statement : IF expression block
-                 | IF expression block ELSE block
-    '''
+    '''if_statement : IF expression block
+                    | IF expression block ELSE block'''
     if len(p) == 4:
         p[0] = If(p[2], p[3])
     else:
         p[0] = If(p[2], p[3], p[5])
 
 def p_for_loop(p):
-    'for_loop : FOR IDENTIFIER IN iterable block'
+    '''for_loop : FOR IDENTIFIER IN iterable block'''
     p[0] = ForLoop(p[2], p[4], p[5])
 
 def p_iterable(p):
     '''iterable : expression
-                | RANGE LPAREN expression COMMA expression RPAREN
-    '''
+                | RANGE LPAREN expression COMMA expression RPAREN'''
     if len(p) == 2:
-        p[0] = execute(p[1], ExecutionContext())
+        p[0] = p[1]
     else:
-        start = execute(p[3], ExecutionContext())
-        end = execute(p[5], ExecutionContext())
-        p[0] = range(start, end)
+        p[0] = RangeExpression(p[3], p[5])
 
 def p_while_statement(p):
-    'while_statement : WHILE expression block'
+    '''while_statement : WHILE expression block'''
     p[0] = While(p[2], p[3])
 
 def p_function_def(p):
     '''function_def : DEFINE IDENTIFIER LPAREN RPAREN block
-                    | DEFINE IDENTIFIER LPAREN param_list RPAREN block
-    '''
+                    | DEFINE IDENTIFIER LPAREN param_list RPAREN block'''
     if len(p) == 6:
         p[0] = FunctionDef(p[2], [], p[5])
     else:
@@ -451,8 +486,7 @@ def p_function_def(p):
 def p_param_list(p):
     '''param_list : IDENTIFIER
                   | param_list COMMA IDENTIFIER
-                  | empty
-    '''
+                  | empty'''
     if len(p) == 2 and p[1] is not None:
         p[0] = [p[1]]
     elif len(p) == 4:
@@ -461,50 +495,32 @@ def p_param_list(p):
         p[0] = []
 
 def p_import_statement(p):
-    'statement : IMPORT IDENTIFIER'
-    p[0] = Import(p[2])  # IMPOTANT: define an Import node class thingy LATER, but DONT FORGET TO DO IT
+    '''import_statement : IMPORT IDENTIFIER'''
+    p[0] = Import(p[2])
 
 def p_return_statement(p):
-    'return_statement : RESULT expression'
+    '''return_statement : RESULT expression'''
     p[0] = Return(p[2])
 
+def p_wait_statement(p):
+    '''wait_statement : WAIT expression'''
+    p[0] = Wait(p[2])
+
 def p_expression(p):
-    '''expression : equality_expr'''
+    '''expression : logic_or_expr'''
     p[0] = p[1]
 
-def p_fstring(p):
-    'fstring : F_QUOTE fstring_content QUOTE'
-    p[0] = FString(p[2])
-
-def p_fstring_content(p):
-    '''fstring_content : fstring_content fstring_part
-                       | fstring_part'''
-    if len(p) == 3:
-        p[0] = p[1] + [p[2]]
-    else:
-        p[0] = [p[1]]
-
-def p_fstring_part(p):
-    '''fstring_part : STRING_CONTENT
-                    | LBRACE expression RBRACE'''
-    if len(p) == 2:
-        p[0] = ('string', p[1])
-    else:
-        p[0] = ('expr', p[2])
-
-def p_logic_expr(p):
-    '''logic_expr : logic_expr OR_OP logic_term
-                  | logic_term
-    '''
+def p_logic_or_expr(p):
+    '''logic_or_expr : logic_or_expr OR logic_and_expr
+                     | logic_and_expr'''
     if len(p) == 4:
         p[0] = BinaryOp('or', p[1], p[3])
     else:
         p[0] = p[1]
 
-def p_logic_term(p):
-    '''logic_term : logic_term AND_OP equality_expr
-                  | equality_expr
-    '''
+def p_logic_and_expr(p):
+    '''logic_and_expr : logic_and_expr AND equality_expr
+                      | equality_expr'''
     if len(p) == 4:
         p[0] = BinaryOp('and', p[1], p[3])
     else:
@@ -533,8 +549,7 @@ def p_relational_expr(p):
 def p_additive_expr(p):
     '''additive_expr : additive_expr PLUS term
                      | additive_expr MINUS term
-                     | term
-    '''
+                     | term'''
     if len(p) == 4:
         p[0] = BinaryOp(p[2], p[1], p[3])
     else:
@@ -544,8 +559,7 @@ def p_term(p):
     '''term : term TIMES factor
             | term DIVIDE factor
             | term MOD factor
-            | factor
-    '''
+            | factor'''
     if len(p) == 4:
         p[0] = BinaryOp(p[2], p[1], p[3])
     else:
@@ -555,8 +569,7 @@ def p_factor(p):
     '''factor : PLUS factor
               | MINUS factor %prec UMINUS
               | NOT factor
-              | primary
-    '''
+              | primary'''
     if len(p) == 3:
         p[0] = UnaryOp(p[1], p[2])
     else:
@@ -565,16 +578,41 @@ def p_factor(p):
 def p_primary(p):
     '''primary : atom
                | primary DOT IDENTIFIER
+               | primary DOT IDENTIFIER LPAREN arg_list RPAREN
+               | primary DOT IDENTIFIER LPAREN RPAREN
                | primary LPAREN arg_list RPAREN
-               | primary LPAREN RPAREN
-    '''
+               | primary LPAREN RPAREN'''
     if len(p) == 2:
+        # atom
         p[0] = p[1]
-    elif p[2] == '.':
+    elif len(p) == 4 and p[2] == '.':
+        # primary DOT IDENTIFIER
         p[0] = MemberAccess(p[1], p[3])
-    elif p[2] == '(':
-        args = p[3] if len(p) == 5 else []
-        p[0] = FunctionCall(p[1], args)
+    elif len(p) == 6 and p[3] != '(':
+        # primary DOT IDENTIFIER LPAREN RPAREN
+        # means primary.member()
+        p[0] = MethodCall(p[1], p[3], [])
+    elif len(p) == 7:
+        # primary DOT IDENTIFIER LPAREN arg_list RPAREN
+        p[0] = MethodCall(p[1], p[3], p[5])
+    elif len(p) == 5 and p[2] == '(':
+        # primary LPAREN arg_list RPAREN
+        p[0] = FunctionCall(p[1], p[3])
+    elif len(p) == 4 and p[2] == '(':
+        # primary LPAREN RPAREN
+        p[0] = FunctionCall(p[1], [])
+
+
+def p_arg_list(p):
+    '''arg_list : expression
+                | arg_list COMMA expression
+                | empty'''
+    if len(p) == 2 and p[1] is not None:
+        p[0] = [p[1]]
+    elif len(p) == 4:
+        p[0] = p[1] + [p[3]]
+    else:
+        p[0] = []
 
 def p_atom(p):
     '''atom : IDENTIFIER
@@ -584,112 +622,50 @@ def p_atom(p):
             | FALSE
             | LPAREN expression RPAREN'''
     if len(p) == 2:
-        token_type = p.slice[1].type
-        if token_type == 'IDENTIFIER':
+        t = p.slice[1].type
+        if t == 'IDENTIFIER':
             p[0] = Variable(p[1])
-        elif token_type == 'NUMBER':
+        elif t == 'NUMBER':
             p[0] = Number(p[1])
-        elif token_type == 'STRING':
+        elif t == 'STRING':
             p[0] = String(p[1])
-        elif token_type == 'TRUE':
+        elif t == 'TRUE':
             p[0] = Boolean(True)
-        elif token_type == 'FALSE':
+        elif t == 'FALSE':
             p[0] = Boolean(False)
     else:
         p[0] = p[2]
 
-
-# def p_member_access_chain(p):
-#     '''member_access_chain : member_access_chain member_access
-#                            | empty'''
-#     if len(p) == 3:
-#         p[0] = p[1] + [p[2]]
-#     else:
-#         p[0] = []
-
-
-def p_member_access(p):
-     '''member_access : DOT IDENTIFIER
-                      | DOT IDENTIFIER LPAREN arg_list RPAREN
-                      | DOT IDENTIFIER LPAREN RPAREN'''
-     if len(p) == 3:
-         # Field access | i dunno either, ask the youtube tutorial guy
-         def access(obj):
-             return getattr(obj, p[2])
-     else:
-         # Method call
-         args = p[4] if len(p) == 6 else []
-
-         def access(obj):
-             method = getattr(obj, p[2])
-             return method(*args)
-     p[0] = access
-
-def p_wait_statement(p):
-    'wait_statement : WAIT expression'
-    p[0] = Wait(p[2])
-
-def p_function_call(p):
-    '''function_call : IDENTIFIER LPAREN arg_list RPAREN
-                     | IDENTIFIER LPAREN RPAREN
-                     | primary DOT IDENTIFIER LPAREN arg_list RPAREN
-                     | primary DOT IDENTIFIER LPAREN RPAREN
-    '''
-    if len(p) == 5:
-        # Simple function call, e.g: func(arg1, arg2)
-        args = p[3]
-        p[0] = FunctionCall(p[1], args)
-    elif len(p) == 4:
-        # Function call with no arguments, e.g: func()
-        p[0] = FunctionCall(p[1], [])
-    elif len(p) == 6:
-        # Method call with arguments, e.g: obj.method(arg1, arg2)
-        obj = p[1]
-        method_name = p[3]
-        args = p[5]
-        p[0] = MethodCall(obj, method_name, args)
+def p_expression_increment(p):
+    '''expression : expression INCREMENT
+                  | expression DECREMENT'''
+    if p[2] == '++':
+        p[0] = UnaryOp('increment', p[1])
     else:
-        # Method call with no arguments, e.g: obj.method()
-        obj = p[1]
-        method_name = p[3]
-        p[0] = MethodCall(obj, method_name, [])
+        p[0] = UnaryOp('decrement', p[1])
 
-def p_arg_list(p):
-    '''arg_list : expression
-                | arg_list COMMA expression
-                | empty
-    '''
-    if len(p) == 2 and p[1] is not None:
-        p[0] = [p[1]]
-    elif len(p) == 4:
-        p[0] = p[1] + [p[3]]
+def p_expression_compound_assignment(p):
+    '''expression : IDENTIFIER PLUS_EQUALS expression
+                  | IDENTIFIER MINUS_EQUALS expression'''
+    if p[2] == '+=':
+        p[0] = CompoundAssignment(p[1], '+', p[3])
     else:
-        p[0] = []
-
-def p_block(p):
-    '''block : LBRACE RBRACE
-             | LBRACE statement_list RBRACE'''
-    if len(p) == 3:
-        p[0] = Block([])
-    else:
-        p[0] = Block(p[2])
+        p[0] = CompoundAssignment(p[1], '-', p[3])
 
 def p_empty(p):
-    'empty :'
+    '''empty :'''
     p[0] = None
 
 def p_error(p):
     if p:
         token_value = str(p.value)
-        suggestions = difflib.get_close_matches(token_value, known_tokens, n=1, cutoff=0.8)
+        suggestions = difflib.get_close_matches(token_value, list(reserved.keys()) + ['(', ')', '{', '}', '+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>='], n=1, cutoff=0.8)
         error_message = f"[ERROR] Syntax error at '{token_value}' on line {p.lineno}"
         if suggestions:
             error_message += f". Did you mean '{suggestions[0]}'?"
         print(Fore.RED + error_message)
-        # Do not skip the token, if you do, the world ends.
     else:
         print(Fore.RED + "[ERROR] Syntax error at EOF")
-
 
 if not args.about:
     # build parser, i think
@@ -745,98 +721,20 @@ if not args.about:
     if args.init:
         print("\033[32m[SUCCESS] Initialization complete.\033[0m")
         about()
-class Import(Node):
-    def __init__(self, module_name):
-        self.module_name = module_name
 
-class MemberAccess(Node):
-    def __init__(self, obj, member):
-        self.obj = obj
-        self.member = member
-
-class Function:
-    def __init__(self, params, body):
-        self.params = params
-        self.body = body
-
-class ExecutionContext:
-    def __init__(self, parent=None):
-        self.variables = {}
-        self.functions = {} if parent is None else parent.functions
-        self.parent = parent
-        self.return_value = None
-
-    def get_variable(self, name):
-        if name in self.variables:
-            return self.variables[name]
-        elif self.parent:
-            return self.parent.get_variable(name)
-        else:
-            raise NameError(f"Undefined variable '{name}'")
-
-    def set_variable(self, name, value):
-        if name in self.variables or self.parent is None:
-            self.variables[name] = value
-        else:
-            self.parent.set_variable(name, value)
-
-
-    def define_function(self, name, function):
-        self.functions[name] = function
-
-    def get_function(self, name):
-        if name in self.functions:
-            return self.functions[name]
-        elif self.parent:
-            return self.parent.get_function(name)
-        else:
-            raise NameError(f"Undefined function '{name}'")
-
-class CompoundAssignment(Node):
-    def __init__(self, name, op, value):
-        self.name = name
-        self.op = op
-        self.value = value
-
-class MethodCall(Node):
-    def __init__(self, obj, method_name, args):
-        self.obj = obj
-        self.method_name = method_name
-        self.args = args
-
-class FString(Node):
-    def __init__(self, parts):
-        self.parts = parts
-
-class BuiltInFunction(Function):
-    def __init__(self, func):
-        self.func = func
-
+# ---------------- EXECUTION -----------------
 class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
-
-class Boolean(Node):
-    def __init__(self, value):
-        self.value = value
-
-class ForLoop(Node):
-    def __init__(self, var_name, iterable, body):
-        self.var_name = var_name
-        self.iterable = iterable
-        self.body = body
-
-class RangeExpression(Node):
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
 
 def execute(node, context):
     if node is None:
         return None
     if isinstance(node, Program):
         for stmt in node.statements:
-            execute(stmt, context)
+            val = execute(stmt, context)
+            if isinstance(stmt, Break):
+                break
     elif isinstance(node, Import):
         module_name = node.module_name
         try:
@@ -846,7 +744,10 @@ def execute(node, context):
             print(Fore.RED + f"[ERROR] Module '{module_name}' not found")
     elif isinstance(node, Block):
         for stmt in node.statements:
-            execute(stmt, context)
+            val = execute(stmt, context)
+            if val == 'break':
+                return 'break'
+        return None
     elif isinstance(node, Number):
         return node.value
     elif isinstance(node, String):
@@ -867,43 +768,22 @@ def execute(node, context):
     elif isinstance(node, If):
         condition = execute(node.condition, context)
         if condition:
-            execute(node.then_branch, context)
+            return execute(node.then_branch, context)
         elif node.else_branch:
-            execute(node.else_branch, context)
-    elif isinstance(node, While):
-        while execute(node.condition, context):
-            execute(node.body, context)
-            if context.return_value is not None:
-                break
+            return execute(node.else_branch, context)
     elif isinstance(node, FunctionDef):
         func = Function(node.params, node.body)
         context.define_function(node.name, func)
-    elif isinstance(node, FString):
-        result = ''
-        for part in node.parts:
-            if part[0] == 'string':
-                result += part[1]
-            elif part[0] == 'expr':
-                result += str(execute(part[1], context))
-        return result
-
     elif isinstance(node, FunctionCall):
-        try:
-            func = context.get_function(node.name)
-        except NameError:
-            suggestions = difflib.get_close_matches(node.name, context.functions.keys(), n=1, cutoff=0.8)
-            if suggestions:
-                print(Fore.YELLOW + f"[WARNING] Undefined function '{node.name}'. Did you mean '{suggestions[0]}'?")
-            else:
-                print(Fore.YELLOW + f"[WARNING] Undefined function '{node.name}'")
-            return
+        # node.name might be a Variable or something else
+        func_name = node.name.name if isinstance(node.name, Variable) else node.name
+        func = context.get_function(func_name)
         args = [execute(arg, context) for arg in node.args]
         if isinstance(func, BuiltInFunction):
-            result = func.func(*args)
-            return result
+            return func.func(*args)
         elif isinstance(func, Function):
             if len(func.params) != len(args):
-                raise TypeError(f"Function '{node.name}' expected {len(func.params)} arguments, got {len(args)}")
+                raise TypeError(f"Function '{func_name}' expected {len(func.params)} arguments, got {len(args)}")
             func_context = ExecutionContext(parent=context)
             for param, arg in zip(func.params, args):
                 func_context.set_variable(param, arg)
@@ -913,64 +793,53 @@ def execute(node, context):
                 return e.value
             return func_context.return_value
         else:
-            raise TypeError(f"'{node.name}' is not a function")
+            raise TypeError(f"'{func_name}' is not a function")
     elif isinstance(node, Return):
         value = execute(node.value, context)
         raise ReturnException(value)
     elif isinstance(node, MethodCall):
         obj = execute(node.obj, context)
         args = [execute(arg, context) for arg in node.args]
-        # ----------------------------------------------------------------------------------------------------------------------
-        if isinstance(obj, str):
-            if node.method_name == 'lower':
-                return obj.lower()
-            elif node.method_name == 'upper':
-                return obj.upper()
-            elif node.method_name == 'strip':
-                return obj.strip()
-            # add more str methods here later 
+
+        # Check if the object has the requested attribute
+        if hasattr(obj, node.method_name):
+            method = getattr(obj, node.method_name)
+            if callable(method):
+                return method(*args)
             else:
-                raise AttributeError(f"'str' object has no attribute '{node.method_name}'")
+                raise TypeError(f"Attribute '{node.method_name}' of object '{type(obj).__name__}' is not callable")
         else:
-            raise TypeError(f"Unsupported object type '{type(obj).__name__}' for method calls")
+            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{node.method_name}'")
     elif isinstance(node, BinaryOp):
         left = execute(node.left, context)
         right = execute(node.right, context)
-        if node.op == '+':
-            return left + right
-        elif node.op == '-':
-            return left - right
-        elif node.op == '*':
-            return left * right
-        elif node.op == '/':
-            return left / right
-        elif node.op == '%':
-            return left % right
-        elif node.op == '<':
-            return left < right
-        elif node.op == '>':
-            return left > right
-        elif node.op == '<=':
-            return left <= right
-        elif node.op == '>=':
-            return left >= right
-        elif node.op == '==':
-            return left == right
-        elif node.op == '!=':
-            return left != right
-        elif node.op == 'and':
-            return left and right
-        elif node.op == 'or':
-            return left or right
-        else:
-            raise ValueError(f"Unknown operator '{node.op}'")
+        ops = {
+            '+': lambda l,r: l+r,
+            '-': lambda l,r: l-r,
+            '*': lambda l,r: l*r,
+            '/': lambda l,r: l/r,
+            '%': lambda l,r: l%r,
+            '<': lambda l,r: l<r,
+            '>': lambda l,r: l>r,
+            '<=': lambda l,r: l<=r,
+            '>=': lambda l,r: l>=r,
+            '==': lambda l,r: l==r,
+            '!=': lambda l,r: l!=r,
+            'and': lambda l,r: l and r,
+            'or': lambda l,r: l or r
+        }
+        return ops[node.op](left, right)
     elif isinstance(node, UnaryOp):
         operand = execute(node.operand, context)
         if node.op == 'increment':
+            if not isinstance(node.operand, Variable):
+                raise TypeError("Increment target must be a variable")
             result = operand + 1
             context.set_variable(node.operand.name, result)
             return result
         elif node.op == 'decrement':
+            if not isinstance(node.operand, Variable):
+                raise TypeError("Decrement target must be a variable")
             result = operand - 1
             context.set_variable(node.operand.name, result)
             return result
@@ -979,13 +848,13 @@ def execute(node, context):
         elif node.op == '-':
             return -operand
         else:
-            raise ValueError(f"Unknown operator '{node.op}'")
+            raise ValueError(f"Unknown unary operator '{node.op}'")
     elif isinstance(node, CompoundAssignment):
-        value = execute(Variable(node.name), context)
+        value = context.get_variable(node.name)
         right = execute(node.value, context)
         if node.op == '+':
             result = value + right
-        elif node.op == '-':
+        else:
             result = value - right
         context.set_variable(node.name, result)
         return result
@@ -996,22 +865,29 @@ def execute(node, context):
         for item in iterable:
             loop_context = ExecutionContext(parent=context)
             loop_context.set_variable(node.var_name, item)
-            execute(node.body, loop_context)
-            if loop_context.return_value is not None:
+            val = execute(node.body, loop_context)
+            if val == 'break':
+                break
+
+    elif isinstance(node, While):
+        while execute(node.condition, context):
+            val = execute(node.body, context)
+            if val == 'break':
+                break
+            if context.return_value is not None:
                 break
 
     elif isinstance(node, RangeExpression):
         start = execute(node.start, context)
         end = execute(node.end, context)
         return range(start, end)
-
+    elif isinstance(node, Break):
+        # Just return something to indicate break
+        return 'break'
     else:
         raise TypeError(f"Unknown node type '{type(node).__name__}'")
 
-source_code = '''
-
-'''
-
+source_code = ''
 if __name__ == '__main__':
 
     if not (args.init or args.about):
@@ -1028,17 +904,34 @@ if __name__ == '__main__':
             elif args.fo:
                 pass  # Continue execution despite syntax errors
 
-# Create the GE context and define built-in functions from Python that i stole
 global_context = ExecutionContext()
 global_context.define_function('str', BuiltInFunction(str))
 global_context.define_function('int', BuiltInFunction(int))
+global_context.define_function('float', BuiltInFunction(float))
+global_context.define_function('abs', BuiltInFunction(abs))
+global_context.define_function('round', BuiltInFunction(round))
+global_context.define_function('min', BuiltInFunction(min))
+global_context.define_function('max', BuiltInFunction(max))
+
+# Input/Output
 global_context.define_function('input', BuiltInFunction(lambda prompt='': input(str(prompt))))
+
+# Random
 global_context.define_function('randomint', BuiltInFunction(lambda min_val, max_val: random.randint(int(min_val), int(max_val))))
+
+# String utilities
 global_context.define_function('length', BuiltInFunction(lambda s: len(str(s))))
 global_context.define_function('substring', BuiltInFunction(lambda s, start, end: str(s)[int(start):int(end)]))
 global_context.define_function('find', BuiltInFunction(lambda s, sub: str(s).find(str(sub))))
-global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(x)))
+global_context.define_function('split', BuiltInFunction(lambda s, delim=' ': str(s).split(str(delim))))
+global_context.define_function('join', BuiltInFunction(lambda delim, lst: str(delim).join(str(x) for x in lst)))
+
+# Math utilities
+global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
+
+# Networking
 global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
+
 
 if not (args.init or args.about):
     # Execute the parsed AST

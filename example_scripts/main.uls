@@ -2,13 +2,8 @@
 import math
 
 # Test Python library support by using sqrt function
-result = math.sqrt(25)
-print("The square root of 25 is: " + str(result))
-
-# Test ANSI color-coding by printing colored text
-print("\033[31mThis text is red\033[0m")
-print("\033[32mThis text is green\033[0m")
-print("\033[34mThis text is blue\033[0m")
+res = math.sqrt(25)
+print("The square root of 25 is: " + str(res))
 
 # In-depth testing of if statements
 x = input("Enter a number: ")
