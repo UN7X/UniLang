@@ -15,6 +15,7 @@ import os
 from os import path
 import platform
 import sys
+import datetime
 
 try:
     parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
@@ -34,49 +35,70 @@ except argparse.ArgumentError as e:
     exit(1)
 
 manual_pages = [
-    # Page 1
+    # Page 1 (Merged Introduction from man-1 Page 1 and man-2 Page 1)
     """UniLang Script (ULS) Manual - Page 1
 ====================================
 Welcome to UniLang Script!
 
-UniLang Script (ULS) is a simple, interpreted programming language designed for beginners. It is inspired by Python and JavaScript, aiming to be easy to learn and use.
+UniLang Script (ULS) is a simple, interpreted programming language designed for beginners. 
+It is inspired by Python and JavaScript, aiming to be easy to learn and use.
 
-Use the command line argument '--man <page>' to navigate to specific pages of this manual.
+This language is designed to be simple and beginner-friendly. ULS aims at:
+- Simple syntax
+- Basic data types: int, float, string, boolean
+- Easy control structures
+- Built-in functions for I/O, math, strings, lists, and more
+
+Use the command line argument '--man <page>' to navigate specific pages of this manual.
 
 Topics:
  - Getting Started
  - Basic Syntax
  - Variables and Data Types
  - Operators
- - Control Structures
+ - Built-in Functions (Strings, Lists, Math, File I/O, etc.)
+ - Control Structures (if, for, while)
  - Functions
- - Built-in Functions
+ - File I/O
+ - Advanced Features (eval, python_eval)
 
 Example:
 pypy interpreter.py --man 2""",
 
-    # Page 2
+    # Page 2 (Merged Getting Started from man-1 Page 2 and Introduction details from man-2 Page 2)
     """UniLang Script (ULS) Manual - Page 2
 ====================================
 Getting Started:
 
 To run a UniLang Script file, use the interpreter followed by the script filename:
-
-Example:
 pypy interpreter.py my_script.uls
 
 Scripts should have the '.uls' extension.
 
-Use '--man 3' to continue to Basic Syntax.""",
+ULS (UniLang Script) is aimed at beginners:
+- Simple syntax similar to C-style blocks (using { })
+- Straightforward data types
+- Built-in tools to make programming easy
 
-    # Page 3
+Use '--man 3' for Basic Syntax.""",
+
+    # Page 3 (Merged Basic Syntax from man-1 Page 3 and man-2 Page 3)
     """UniLang Script (ULS) Manual - Page 3
 ====================================
 Basic Syntax:
 
 - Statements end with a newline.
-- Use braces { } to denote blocks of code.
+- Use '{' and '}' to denote blocks of code.
 - Comments start with '#' and continue to the end of the line.
+- Conditions and loops can use parentheses for clarity:
+  if (x > 10) {
+      print("x > 10")
+  } else {
+      print("x <= 10")
+  }
+
+- Expressions can be grouped with ( ... ).
+- No semicolons needed; end of line or block ends a statement.
 
 Example:
 # This is a comment
@@ -84,91 +106,117 @@ print("Hello, World!")
 
 Use '--man 4' to learn about Variables and Data Types.""",
 
-    # Page 4
+    # Page 4 (Merged Variables and Data Types from man-1 Page 4 and man-2 Page 4)
     """UniLang Script (ULS) Manual - Page 4
 ====================================
 Variables and Data Types:
 
-Variables are used to store information. You can assign a value to a variable using the '=' operator.
-
-Example:
+Variables store information using the '=' operator:
 x = 10
 name = "Alice"
 is_active = true
 
 Data Types:
-- Numbers: integers (e.g., 10, -5)
-- Strings: text enclosed in double quotes (e.g., "Hello")
+- Numbers: integers (e.g., 10, -5), floats (e.g., 3.14)
+- Strings: text in double quotes (e.g., "Hello")
 - Booleans: true or false
+- Lists: [1, 2, 3], ["a", "b", "c"], and can nest like [[1,2],[3,4]]
 
-Use '--man 5' to learn about Operators.""",
+ULS supports int, float, string, boolean, and lists for versatile data handling.
 
-    # Page 5
+Use '--man 5' to learn about Operators and move towards Built-in Functions.""",
+
+    # Page 5 (Merged Operators from man-1 Page 5 with a lead-in to built-ins from man-2)
     """UniLang Script (ULS) Manual - Page 5
 ====================================
 Operators:
 
-Arithmetic Operators:
-- Addition: +
-- Subtraction: -
-- Multiplication: *
-- Division: /
-- Modulo: %
+Arithmetic:
+- + (add), - (subtract), * (multiply), / (divide), % (modulo)
 
-Comparison Operators:
-- Equal to: ==
-- Not equal to: !=
-- Greater than: >
-- Less than: <
-- Greater than or equal to: >=
-- Less than or equal to: <=
+Comparison:
+- ==, !=, >, <, >=, <=
 
-Logical Operators:
-- And: and
-- Or: or
-- Not: not
+Logical:
+- and, or, not
 
 Example:
 if (x > 0) and (x < 10) {
     print("x is between 1 and 9")
 }
 
-Use '--man 6' to learn about Control Structures.""",
+After understanding operators, let's explore built-in functions for strings, lists, math, and more.
 
-    # Page 6
+Use '--man 6' for Built-in Functions.""",
+
+    # Page 6 (Merged Built-in Functions from man-1 Page 8 and man-2 Page 5)
     """UniLang Script (ULS) Manual - Page 6
+====================================
+Built-in Functions:
+
+**Basic I/O and Conversion:**
+- print(value): Display value.
+- input(prompt): Get user input.
+- str(value): Convert to string.
+- int(value): Convert to integer.
+- float(value): Convert to float.
+- length(value): Get length of strings or lists.
+- randomint(min, max): Random integer between min and max.
+- sqrt(value): Square root of a number.
+
+**String Functions:**
+- replace(s, old, new)
+- upper(s), lower(s), capitalize(s)
+- find(s, sub)
+- substring(s, start, end)
+- split(s, delim), join(delim, lst)
+
+**List Functions:**
+- append(lst, item)
+- remove(lst, item)
+- sum(lst)
+- any(lst), all(lst)
+- sorted(lst), reverse(lst)
+- random_choice(lst), random_shuffle(lst)
+
+**Math & Utility:**
+- abs(x), round(x, ndigits=0)
+- min(...), max(...)
+- pow(x, y), sin(x), cos(x), tan(x), log(x, base=10)
+- current_time(), current_date()
+
+Use '--man 7' for Control Structures.""",
+
+    # Page 7 (Merged Control Structures from man-1 Page 6 and man-2 Page 6)
+    """UniLang Script (ULS) Manual - Page 7
 ====================================
 Control Structures:
 
-If/Else Statements:
-if condition {
-    # code to execute if condition is true
+If/Else:
+if (condition) {
+    # if true
 } else {
-    # code to execute if condition is false
+    # if false
 }
 
 Example:
 if x > 10 {
-    print("x is greater than 10")
+    print("x > 10")
 } else {
-    print("x is 10 or less")
+    print("x <= 10")
 }
 
-While Loops:
-while condition {
-    # code to execute while condition is true
+While loops:
+while (condition) {
+    # executes while condition is true
 }
 
-Example:
-i = 0
-while i < 5 {
-    print(i)
-    i = i + 1
-}
-
-For Loops:
-for variable in range(start, end) {
-    # code to execute for each value
+For loops:
+for i in range(start, end) {
+    # i goes from start to end-1
+    if i == someValue {
+        break
+    }
 }
 
 Example:
@@ -176,18 +224,16 @@ for i in range(1, 5) {
     print(i)
 }
 
-Use '--man 7' to learn about Functions.""",
+Use '--man 8' for Functions.""",
 
-    # Page 7
-    """UniLang Script (ULS) Manual - Page 7
+    # Page 8 (Merged Functions from man-1 Page 7 and man-2 Page 7)
+    """UniLang Script (ULS) Manual - Page 8
 ====================================
 Functions:
 
-Functions are blocks of reusable code that perform a specific task. You can define a function using the 'define' keyword.
-
-Syntax:
-define function_name(parameters) {
-    # code to execute
+Define reusable blocks of code using 'define':
+define function_name(params) {
+    # code
     return value
 }
 
@@ -196,45 +242,51 @@ define greet(name) {
     return "Hello, " + name + "!"
 }
 
-Call the function:
 message = greet("Alice")
 print(message)
 
-Use '--man 8' to learn about Built-in Functions.""",
+Functions can return values. If no return is provided, they return None by default.
 
-    # Page 8
-    """UniLang Script (ULS) Manual - Page 8
-====================================
-Built-in Functions:
+Use '--man 9' for File I/O.""",
 
-UniLang provides several built-in functions to perform common tasks.
-
-- print(value): Display the value to the console.
-- input(prompt): Get input from the user.
-- str(value): Convert value to a string.
-- int(value): Convert value to an integer.
-- length(value): Get the length of a string.
-- randomint(min, max): Generate a random integer between min and max.
-- sqrt(value): Calculate the square root of a number.
-
-Example:
-name = input("Enter your name: ")
-print("Hello, " + name + "!")
-rand_num = randomint(1, 100)
-print("Random number between 1 and 100: " + str(rand_num))
-
-Use '--man 9' to see additional resources.""",
-
-    # Page 9
+    # Page 9 (Merged File I/O from man-2 Page 8 and referencing it from man-1 final)
     """UniLang Script (ULS) Manual - Page 9
 ====================================
-Additional Resources:
+File I/O:
+
+- read_file(filename): read entire file as string
+- write_file(filename, content): overwrite file
+- append_file(filename, content): append content
+
+Example:
+content = read_file("example.txt")
+print(content)
+write_file("output.txt", "Hello")
+append_file("output.txt", "\\nMore text")
+
+Be cautious and ensure you have the correct permissions.
+File I/O gives you direct access to the filesystem, so handle with care.
+
+Use '--man 10' for Advanced Features.""",
+
+    # Page 10 (Merged Advanced Features from man-2 Page 9 and final notes from man-1 Page 9)
+    """UniLang Script (ULS) Manual - Page 10
+====================================
+Advanced Features:
+
+- eval(code): evaluate ULS code at runtime
+- python_eval(code): evaluate a Python expression at runtime (security risk if untrusted code is used)
+
+Examples:
+res = python_eval("3 * 4 + 5")
+print(res)
+
+uls_code = "y = 20\\ny + 30"
+val = eval(uls_code)
+print(val)
 
 For more examples and detailed documentation, please visit:
-
 https://un7x.net/unilang-script
-
-Thank you for using UniLang Script!
 
 That's all for the manual. Use '--man <page>' to revisit any section.
 """
@@ -353,7 +405,7 @@ def check_for_updates():
         if current_version < latest_release:
             print(f"\033[93m[WARNING] A newer version ({latest_release}) is available. Please update for best stability.\033[0m")
         else:
-            print("\033[92m[INFO] You are using the latest version.\033[0m")
+            print("\033[92m[INFO] You are using the latest ULSI version.\033[0m")
     except Exception as e:
         print("\033[91m[ERROR] Could not check for updates.\033[0m", e)    
 
@@ -396,7 +448,7 @@ tokens = [
     'NUMBER', 'STRING', 'IDENTIFIER',
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQUALS', 'LPAREN', 'RPAREN', 'COMMA',
-    'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT',
+    'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT', 'RBRACKET', 'LBRACKET',
     'LBRACE', 'RBRACE', 'INCREMENT', 'DECREMENT', 'PLUS_EQUALS', 'MINUS_EQUALS',
 ] + list(reserved.values())
 
@@ -424,6 +476,8 @@ t_INCREMENT = r'\+\+'
 t_DECREMENT = r'--'
 t_PLUS_EQUALS = r'\+='
 t_MINUS_EQUALS = r'-='
+t_LBRACKET = r'\['
+t_RBRACKET = r']'
 
 t_ignore = ' \t'
 
@@ -556,6 +610,10 @@ class MethodCall(Node):
         self.obj = obj
         self.method_name = method_name
         self.args = args
+
+class ListLiteral(Node):
+    def __init__(self, elements):
+        self.elements = elements
 
 class Boolean(Node):
     def __init__(self, value):
@@ -816,7 +874,8 @@ def p_atom(p):
             | STRING
             | TRUE
             | FALSE
-            | LPAREN expression RPAREN'''
+            | LPAREN expression RPAREN
+            | list_literal'''
     if len(p) == 2:
         t = p.slice[1].type
         if t == 'IDENTIFIER':
@@ -829,8 +888,28 @@ def p_atom(p):
             p[0] = Boolean(True)
         elif t == 'FALSE':
             p[0] = Boolean(False)
+        else:
+            # For list_literal or unknown handled below.
+            p[0] = p[1]
     else:
+        # ( expression )
         p[0] = p[2]
+
+def p_list_literal(p):
+    '''list_literal : LBRACKET item_list RBRACKET'''
+    p[0] = ListLiteral(p[2])
+
+def p_item_list(p):
+    '''item_list : expression
+                 | item_list COMMA expression
+                 | empty'''
+    if p[1] is None:
+        p[0] = []
+    elif len(p) == 2:
+        p[0] = [p[1]]
+    else:
+        p[0] = p[1] + [p[3]]
+
 
 def p_expression_increment(p):
     '''expression : expression INCREMENT
@@ -933,10 +1012,11 @@ class ReturnException(Exception):
 def execute(node, context):
     if node is None:
         return None
-    if handler := NODE_HANDLERS.get(type(node)):
-        return handler(node, context)
+    node_type = type(node)
+    if node_type in NODE_HANDLERS:
+        return NODE_HANDLERS[node_type](node, context)
     else:
-        raise TypeError(f"Unknown node type '{type(node).__name__}'")
+        raise TypeError(f"Unknown node type '{node_type.__name__}'")
 
 def handle_program(node, context):
     for stmt in node.statements:
@@ -1105,6 +1185,9 @@ def handle_range_expression(node, context):
     end = execute(node.end, context)
     return range(start, end)
 
+def handle_list_literal(node, context):
+    return [execute(element, context) for element in node.elements]
+
 def handle_break(node, context):
     return 'break'
 
@@ -1134,6 +1217,7 @@ NODE_HANDLERS[ForLoop] = handle_for_loop
 NODE_HANDLERS[While] = handle_while
 NODE_HANDLERS[RangeExpression] = handle_range_expression
 NODE_HANDLERS[Break] = handle_break
+NODE_HANDLERS[ListLiteral] = handle_list_literal
 
 source_code = ''
 if __name__ == '__main__' and not args.init and not args.about and not args.check:
@@ -1149,7 +1233,9 @@ if __name__ == '__main__' and not args.init and not args.about and not args.chec
             exit(1)
 
 
+
 global_context = ExecutionContext()
+# Math
 global_context.define_function('str', BuiltInFunction(str))
 global_context.define_function('int', BuiltInFunction(int))
 global_context.define_function('float', BuiltInFunction(float))
@@ -1157,9 +1243,18 @@ global_context.define_function('abs', BuiltInFunction(abs))
 global_context.define_function('round', BuiltInFunction(round))
 global_context.define_function('min', BuiltInFunction(min))
 global_context.define_function('max', BuiltInFunction(max))
+global_context.define_function('pow', BuiltInFunction(lambda x, y: math.pow(float(x), float(y))))
+global_context.define_function('sin', BuiltInFunction(lambda x: math.sin(float(x))))
+global_context.define_function('cos', BuiltInFunction(lambda x: math.cos(float(x))))
+global_context.define_function('tan', BuiltInFunction(lambda x: math.tan(float(x))))
+global_context.define_function('log', BuiltInFunction(lambda x, base=10: math.log(float(x), float(base))))
 
 # Input/Output
 global_context.define_function('input', BuiltInFunction(lambda prompt='': input(str(prompt))))
+
+# Datetime
+global_context.define_function('current_time', BuiltInFunction(lambda: str(datetime.datetime.now().time())))
+global_context.define_function('current_date', BuiltInFunction(lambda: str(datetime.datetime.now().date())))
 
 # Random
 global_context.define_function('randomint', BuiltInFunction(lambda min_val, max_val: random.randint(int(min_val), int(max_val))))
@@ -1170,12 +1265,52 @@ global_context.define_function('substring', BuiltInFunction(lambda s, start, end
 global_context.define_function('find', BuiltInFunction(lambda s, sub: str(s).find(str(sub))))
 global_context.define_function('split', BuiltInFunction(lambda s, delim=' ': str(s).split(str(delim))))
 global_context.define_function('join', BuiltInFunction(lambda delim, lst: str(delim).join(str(x) for x in lst)))
+global_context.define_function('replace', BuiltInFunction(lambda s, old, new: str(s).replace(str(old), str(new))))
+global_context.define_function('upper', BuiltInFunction(lambda s: str(s).upper()))
+global_context.define_function('lower', BuiltInFunction(lambda s: str(s).lower()))
+global_context.define_function('capitalize', BuiltInFunction(lambda s: str(s).capitalize()))
+
+
+# List utilities
+global_context.define_function('append', BuiltInFunction(lambda lst, item: lst.append(item) or lst))
+global_context.define_function('remove', BuiltInFunction(lambda lst, item: lst.remove(item) or lst))
+global_context.define_function('len', BuiltInFunction(lambda lst: len(lst)))
+global_context.define_function('sum', BuiltInFunction(lambda lst: sum(lst)))
+global_context.define_function('any', BuiltInFunction(lambda lst: any(lst)))
+global_context.define_function('all', BuiltInFunction(lambda lst: all(lst)))
+global_context.define_function('sorted', BuiltInFunction(lambda lst: sorted(lst)))
+global_context.define_function('reverse', BuiltInFunction(lambda lst: lst.reverse() or lst))
+global_context.define_function('random_choice', BuiltInFunction(lambda lst: random.choice(lst)))
+global_context.define_function('random_shuffle', BuiltInFunction(lambda lst: random.shuffle(lst) or lst))
+
+# File I/O
+global_context.define_function('read_file', BuiltInFunction(lambda filename: open(str(filename), 'r').read()))
+global_context.define_function('write_file', BuiltInFunction(lambda filename, content: open(str(filename), 'w').write(str(content)) or None))
+global_context.define_function('append_file', BuiltInFunction(lambda filename, content: open(str(filename), 'a').write(str(content)) or None))
 
 # Math utilities
 global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
 
 # Networking
 global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
+
+def python_eval_func(expr):
+    return eval(expr)
+
+def python_exec_func(stmt):
+    env = {}
+
+    exec(stmt, {}, env)
+    return env.get('result', None)
+
+def uls_eval_func(expr):
+    return execute(parser.parse(expr), global_context)
+
+# Code execution
+global_context.define_function('python_eval', BuiltInFunction(lambda code: python_eval_func(str(code))))
+global_context.define_function('eval', BuiltInFunction(lambda code: uls_eval_func(str(code))))
+global_context.define_function('python_exec', BuiltInFunction(lambda code: python_exec_func(str(code))))
+
 
 
 if not (args.init or args.about or args.check):

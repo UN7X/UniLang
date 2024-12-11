@@ -1,0 +1,82 @@
+# test_features.uls
+# This script tests lists, file I/O, built-in functions, and advanced features
+print(" ")
+print("=== Testing Basic Data Types and Functions ===")
+print(" ")
+x = 10
+print("x = " + str(x))
+print("abs(-5) = " + str(abs(-5)))
+print("sqrt(16) = " + str(sqrt(16)))
+print("randomint(1,10): " + str(randomint(1,10)))
+print(" ")
+print("=== Testing Lists ===")
+print(" ")
+lst = [1, 2, 3]
+append(lst, 4)
+print("List after append: " + str(lst))
+remove(lst, 2)
+print("List after remove(2): " + str(lst))
+print("length of lst: " + str(len(lst)))
+print("sum(lst): " + str(sum(lst)))
+print("sorted(lst): " + str(sorted(lst)))
+reverse(lst)
+print("List after reverse: " + str(lst))
+lst2 = ["apple", "banana", "cherry"]
+print("random_choice(lst2): " + str(random_choice(lst2)))
+random_shuffle(lst2)
+print("lst2 after random_shuffle: " + str(lst2))
+print(" ")
+print("=== Testing Strings ===")
+print(" ")
+msg = "Hello, World!"
+print("upper(msg): " + upper(msg))
+print("replace(msg, 'World', 'ULS'): " + replace(msg, "World", "ULS"))
+print("substring(msg, 0,5): " + substring(msg, 0,5))
+parts = split(msg, " ")
+print("split(msg, ' '): " + str(parts))
+joined = join("-", parts)
+print("join('-', parts): " + joined)
+print(" ")
+print("=== Testing Control Structures ===")
+print(" ")
+count = 0
+while count < 3 {
+    print("While loop count: " + str(count))
+    count = count + 1
+}
+
+for i in range(1, 6) {
+    print("For loop i: " + str(i))
+    if i == 3 {
+        print("Breaking out of loop at i=3")
+        break
+    }
+}
+print(" ")
+print("=== Testing Functions ===")
+print(" ")
+define greet(name) {
+    print("Hello, " + str(name) + "!")
+}
+greet("ULS User")
+
+define add(a, b) {
+    result a + b
+}
+print("add(5,7) = " + str(add(5,7)))
+
+print("=== Testing File I/O ===")
+write_file("test_output.txt", "This is a test.")
+append_file("test_output.txt", "\Appended line.")
+content = read_file("test_output.txt")
+print("Content of test_output.txt:")
+print(content)
+print(" ")
+print("=== Testing eval and python_eval ===")
+print(" ")
+eval_result = eval("z = 30; z + 10")
+print("eval result: " + str(eval_result))
+py_result = python_eval("2 ** 3")
+print("python_eval('2 ** 3'): " + str(py_result))
+print(" ")
+print("=== End of Tests ===")
