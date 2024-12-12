@@ -441,13 +441,16 @@ reserved = {
     'true': 'TRUE',
     'false': 'FALSE',
     'import': 'IMPORT',
-    'break': 'BREAK'
+    'break': 'BREAK',
+    'try': 'TRY',
+    'except': 'EXCEPT',
+    'finally': 'FINALLY'
 }
 
 tokens = [
     'NUMBER', 'STRING', 'IDENTIFIER',
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
-    'EQUALS', 'LPAREN', 'RPAREN', 'COMMA',
+    'EQUALS', 'LPAREN', 'RPAREN', 'COMMA', 'SEMICOLON', 'TRIPLE_STRING',
     'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT', 'RBRACKET', 'LBRACKET',
     'LBRACE', 'RBRACE', 'INCREMENT', 'DECREMENT', 'PLUS_EQUALS', 'MINUS_EQUALS',
 ] + list(reserved.values())
@@ -478,7 +481,8 @@ t_PLUS_EQUALS = r'\+='
 t_MINUS_EQUALS = r'-='
 t_LBRACKET = r'\['
 t_RBRACKET = r']'
-
+t_SEMICOLON = r';'
+t_TRIPLE_STRING = r'"""'
 t_ignore = ' \t'
 
 def t_COMMENT(t):
@@ -491,8 +495,25 @@ def t_IDENTIFIER(t):
 
 def t_STRING(t):
     r'\"([^\\\n]|(\\.))*?\"'
-    t.value = t.value[1:-1]
+    
+    # Remove the quotes
+    val = t.value[1:-1]
+    # Replace known escape sequences
+    val = val.encode('utf-8').decode('unicode_escape')
+    t.value = val
     return t
+
+def t_MULTILINE_STRING(t):
+    r'"""([^"\\]|\\.|"(?!""))*"""'
+    # This regex matches a triple-quoted string, allowing \" inside.
+    # Extract the content without the triple quotes:
+    val = t.value[3:-3]
+    # Decode escapes if desired:
+    val = val.encode('utf-8').decode('unicode_escape')
+    t.type = 'STRING'
+    t.value = val
+    return t
+
 
 def t_NUMBER(t):
     r'\d+'
@@ -633,6 +654,12 @@ class RangeExpression(Node):
 class Break(Node):
     pass
 
+class TryExceptFinally(Node):
+    def __init__(self, try_block, except_clauses, finally_block=None):
+        self.try_block = try_block
+        self.except_clauses = except_clauses
+        self.finally_block = finally_block
+
 class Function:
     def __init__(self, params, body):
         self.params = params
@@ -696,9 +723,22 @@ def p_program(p):
     p[0] = Program(p[1])
 
 def p_statement_list(p):
-    '''statement_list : statement_list statement
+    '''statement_list : statement_list separator statement
                       | statement'''
-    p[0] = p[1] + [p[2]] if len(p) == 3 else [p[1]]
+    if len(p) == 4:
+        p[0] = p[1] + [p[3]]
+    else:
+        p[0] = [p[1]]
+
+def p_separator(p):
+    '''separator : NEWLINE
+                 | SEMICOLON
+                 | NEWLINE separator
+                 | SEMICOLON separator'''
+    # This rule allows multiple separators in a row. If you prefer stricter rules,
+    # just pick one. For simplicity, treat them all as valid "separators".
+    pass
+
 
 def p_statement(p):
     '''statement : assignment
@@ -729,8 +769,39 @@ def p_assignment(p):
     p[0] = Assignment(p[1], p[3])
 
 def p_print_statement(p):
-    '''print_statement : PRINT LPAREN expression RPAREN'''
-    p[0] = Print(p[3])
+    '''print_statement : PRINT LPAREN RPAREN
+                       | PRINT LPAREN expression RPAREN'''
+    if len(p) == 4:
+        # print()
+        p[0] = Print(String(""))  # Print empty line
+    else:
+        p[0] = Print(p[3])
+
+
+def p_try_statement(p):
+    '''try_statement : TRY block except_clauses
+                     | TRY block except_clauses FINALLY block
+                     | TRY block FINALLY block'''
+
+# except_clauses: one or more except clauses
+def p_except_clauses(p):
+    '''except_clauses : except_clause
+                      | except_clauses except_clause'''
+    if len(p) == 2:
+        p[0] = [p[1]]
+    else:
+        p[0] = p[1] + [p[2]]
+
+def p_except_clause(p):
+    '''except_clause : EXCEPT IDENTIFIER block
+                     | EXCEPT block'''
+    # except with an identifier means catching a certain "exception type"
+    # For simplicity, we treat IDENTIFIER as the "exception name".
+    if len(p) == 4:
+        p[0] = ('except', p[2], p[3])
+    else:
+        p[0] = ('except', None, p[2])
+
 
 def p_if_statement(p):
     '''if_statement : IF expression block
@@ -1065,6 +1136,22 @@ def handle_wait(node, context):
 def handle_boolean(node, context):
     return node.value
 
+def handle_try_except_finally(node, context):
+    try:
+        execute(node.try_block, context)
+    except Exception as e:  
+        # Match exception type with except_clauses (when implementing custom exceptions)
+        for ctype, var, block in node.except_clauses:
+            # If exception matches ctype (or no ctype means catch all)
+            # define var if given
+            if var:
+                context.set_variable(var, str(e))
+            execute(block, context)
+    finally:
+        if node.finally_block:
+            execute(node.finally_block, context)
+
+
 def handle_if(node, context):
     if condition := execute(node.condition, context):
         return execute(node.then_branch, context)
@@ -1218,6 +1305,7 @@ NODE_HANDLERS[While] = handle_while
 NODE_HANDLERS[RangeExpression] = handle_range_expression
 NODE_HANDLERS[Break] = handle_break
 NODE_HANDLERS[ListLiteral] = handle_list_literal
+NODE_HANDLERS[TryExceptFinally] = handle_try_except_finally
 
 source_code = ''
 if __name__ == '__main__' and not args.init and not args.about and not args.check:
