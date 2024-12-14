@@ -108,22 +108,20 @@ print("")
 print("=== Testing Networking Features ===")
 print("")
 
-try {
-    response = http_get("https://api.github.com/zen")
+response = http_get("https://api.github.com/zen")
+if response {
     print("GitHub Zen: " + str(response))
-} except error {
-    print("HTTP Request failed: " + str(error))
-} finally {
-    print("HTTP request completed")
+} else {
+    print("HTTP Request failed")
 }
 
-# Test JSON handling
-try {
-    json_str = "{\"name\": \"John\", \"age\": 30}"
-    parsed = parse_json(json_str)
+# Test JSON handling 
+json_str = "{\"name\": \"John\", \"age\": 30}"
+parsed = parse_json(json_str)
+if parsed {
     print("Parsed JSON: " + str(parsed))
-} except error {
-    print("JSON parsing failed: " + str(error))
+} else {
+    print("JSON parsing failed")
 }
 
 # Test URL operations
