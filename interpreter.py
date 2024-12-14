@@ -16,6 +16,15 @@ from os import path
 import platform
 import sys
 import datetime
+import json
+from urllib.parse import urlparse, urljoin
+import socket
+import asyncio
+try:
+    from manual import manual_pages
+except ImportError:
+    print("Manual not found. Please ensure manual.py exists and is in the same directory.")
+    exit(1)
 
 try:
     parser_arg = argparse.ArgumentParser(description='UniLang Interpreter')
@@ -33,265 +42,6 @@ try:
 except argparse.ArgumentError as e:
     print(f"\033[93m[WARNING] {e}\033[0m")
     exit(1)
-
-manual_pages = [
-    # Page 1 (Merged Introduction from man-1 Page 1 and man-2 Page 1)
-    """UniLang Script (ULS) Manual - Page 1
-====================================
-Welcome to UniLang Script!
-
-UniLang Script (ULS) is a simple, interpreted programming language designed for beginners. 
-It is inspired by Python and JavaScript, aiming to be easy to learn and use.
-
-This language is designed to be simple and beginner-friendly. ULS aims at:
-- Simple syntax
-- Basic data types: int, float, string, boolean
-- Easy control structures
-- Built-in functions for I/O, math, strings, lists, and more
-
-Use the command line argument '--man <page>' to navigate specific pages of this manual.
-
-Topics:
- - Getting Started
- - Basic Syntax
- - Variables and Data Types
- - Operators
- - Built-in Functions (Strings, Lists, Math, File I/O, etc.)
- - Control Structures (if, for, while)
- - Functions
- - File I/O
- - Advanced Features (eval, python_eval)
-
-Example:
-pypy interpreter.py --man 2""",
-
-    # Page 2 (Merged Getting Started from man-1 Page 2 and Introduction details from man-2 Page 2)
-    """UniLang Script (ULS) Manual - Page 2
-====================================
-Getting Started:
-
-To run a UniLang Script file, use the interpreter followed by the script filename:
-pypy interpreter.py my_script.uls
-
-Scripts should have the '.uls' extension.
-
-ULS (UniLang Script) is aimed at beginners:
-- Simple syntax similar to C-style blocks (using { })
-- Straightforward data types
-- Built-in tools to make programming easy
-
-Use '--man 3' for Basic Syntax.""",
-
-    # Page 3 (Merged Basic Syntax from man-1 Page 3 and man-2 Page 3)
-    """UniLang Script (ULS) Manual - Page 3
-====================================
-Basic Syntax:
-
-- Statements end with a newline.
-- Use '{' and '}' to denote blocks of code.
-- Comments start with '#' and continue to the end of the line.
-- Conditions and loops can use parentheses for clarity:
-  if (x > 10) {
-      print("x > 10")
-  } else {
-      print("x <= 10")
-  }
-
-- Expressions can be grouped with ( ... ).
-- No semicolons needed; end of line or block ends a statement.
-
-Example:
-# This is a comment
-print("Hello, World!")
-
-Use '--man 4' to learn about Variables and Data Types.""",
-
-    # Page 4 (Merged Variables and Data Types from man-1 Page 4 and man-2 Page 4)
-    """UniLang Script (ULS) Manual - Page 4
-====================================
-Variables and Data Types:
-
-Variables store information using the '=' operator:
-x = 10
-name = "Alice"
-is_active = true
-
-Data Types:
-- Numbers: integers (e.g., 10, -5), floats (e.g., 3.14)
-- Strings: text in double quotes (e.g., "Hello")
-- Booleans: true or false
-- Lists: [1, 2, 3], ["a", "b", "c"], and can nest like [[1,2],[3,4]]
-
-ULS supports int, float, string, boolean, and lists for versatile data handling.
-
-Use '--man 5' to learn about Operators and move towards Built-in Functions.""",
-
-    # Page 5 (Merged Operators from man-1 Page 5 with a lead-in to built-ins from man-2)
-    """UniLang Script (ULS) Manual - Page 5
-====================================
-Operators:
-
-Arithmetic:
-- + (add), - (subtract), * (multiply), / (divide), % (modulo)
-
-Comparison:
-- ==, !=, >, <, >=, <=
-
-Logical:
-- and, or, not
-
-Example:
-if (x > 0) and (x < 10) {
-    print("x is between 1 and 9")
-}
-
-After understanding operators, let's explore built-in functions for strings, lists, math, and more.
-
-Use '--man 6' for Built-in Functions.""",
-
-    # Page 6 (Merged Built-in Functions from man-1 Page 8 and man-2 Page 5)
-    """UniLang Script (ULS) Manual - Page 6
-====================================
-Built-in Functions:
-
-**Basic I/O and Conversion:**
-- print(value): Display value.
-- input(prompt): Get user input.
-- str(value): Convert to string.
-- int(value): Convert to integer.
-- float(value): Convert to float.
-- length(value): Get length of strings or lists.
-- randomint(min, max): Random integer between min and max.
-- sqrt(value): Square root of a number.
-
-**String Functions:**
-- replace(s, old, new)
-- upper(s), lower(s), capitalize(s)
-- find(s, sub)
-- substring(s, start, end)
-- split(s, delim), join(delim, lst)
-
-**List Functions:**
-- append(lst, item)
-- remove(lst, item)
-- sum(lst)
-- any(lst), all(lst)
-- sorted(lst), reverse(lst)
-- random_choice(lst), random_shuffle(lst)
-
-**Math & Utility:**
-- abs(x), round(x, ndigits=0)
-- min(...), max(...)
-- pow(x, y), sin(x), cos(x), tan(x), log(x, base=10)
-- current_time(), current_date()
-
-Use '--man 7' for Control Structures.""",
-
-    # Page 7 (Merged Control Structures from man-1 Page 6 and man-2 Page 6)
-    """UniLang Script (ULS) Manual - Page 7
-====================================
-Control Structures:
-
-If/Else:
-if (condition) {
-    # if true
-} else {
-    # if false
-}
-
-Example:
-if x > 10 {
-    print("x > 10")
-} else {
-    print("x <= 10")
-}
-
-While loops:
-while (condition) {
-    # executes while condition is true
-}
-
-For loops:
-for i in range(start, end) {
-    # i goes from start to end-1
-    if i == someValue {
-        break
-    }
-}
-
-Example:
-for i in range(1, 5) {
-    print(i)
-}
-
-Use '--man 8' for Functions.""",
-
-    # Page 8 (Merged Functions from man-1 Page 7 and man-2 Page 7)
-    """UniLang Script (ULS) Manual - Page 8
-====================================
-Functions:
-
-Define reusable blocks of code using 'define':
-define function_name(params) {
-    # code
-    return value
-}
-
-Example:
-define greet(name) {
-    return "Hello, " + name + "!"
-}
-
-message = greet("Alice")
-print(message)
-
-Functions can return values. If no return is provided, they return None by default.
-
-Use '--man 9' for File I/O.""",
-
-    # Page 9 (Merged File I/O from man-2 Page 8 and referencing it from man-1 final)
-    """UniLang Script (ULS) Manual - Page 9
-====================================
-File I/O:
-
-- read_file(filename): read entire file as string
-- write_file(filename, content): overwrite file
-- append_file(filename, content): append content
-
-Example:
-content = read_file("example.txt")
-print(content)
-write_file("output.txt", "Hello")
-append_file("output.txt", "\\nMore text")
-
-Be cautious and ensure you have the correct permissions.
-File I/O gives you direct access to the filesystem, so handle with care.
-
-Use '--man 10' for Advanced Features.""",
-
-    # Page 10 (Merged Advanced Features from man-2 Page 9 and final notes from man-1 Page 9)
-    """UniLang Script (ULS) Manual - Page 10
-====================================
-Advanced Features:
-
-- eval(code): evaluate ULS code at runtime
-- python_eval(code): evaluate a Python expression at runtime (security risk if untrusted code is used)
-
-Examples:
-res = python_eval("3 * 4 + 5")
-print(res)
-
-uls_code = "y = 20\\ny + 30"
-val = eval(uls_code)
-print(val)
-
-For more examples and detailed documentation, please visit:
-https://un7x.net/unilang-script
-
-That's all for the manual. Use '--man <page>' to revisit any section.
-"""
-]
-
 
 if args.man:
     try:
@@ -311,7 +61,9 @@ try:
     from colorama import init, Fore, Style
     init(autoreset=True)
     import requests
+    from requests.exceptions import RequestException
     import sys
+    import aiohttp
 except ImportError or ModuleNotFoundError:
     if not args.init:
         print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
@@ -326,13 +78,13 @@ except ImportError or ModuleNotFoundError:
 
     try:
         pkg_resources.get_distribution('ply')
-        print("\033[36m[INFO]ply is already installed.\033[0m")
+        print("\033[36m[INFO] ply is already installed.\033[0m")
         pkg_resources.get_distribution('colorama')
-        print("\033[36m[INFO]colorama is already installed.\033[0m")
+        print("\033[36m[INFO] colorama is already installed.\033[0m")
         pkg_resources.get_distribution('requests')
-        print("\033[36m[INFO]requests is already installed.\033[0m")
-        pkg_resources.get_distribution('tqdm')
-        print("\033[36m[INFO]tqdm is already installed.\033[0m")
+        print("\033[36m[INFO] requests is already installed.\033[0m")
+        pkg_resources.get_distribution('aiohttp')
+        print("\033[36m[INFO] aiohttp is already installed.\033[0m")
     except pkg_resources.DistributionNotFound as e:
         missing_packages = [str(e).split("'")[1]]
         print(f"\033[93m[WARNING]Required package(s): {missing_packages} not found. Installing missing package(s)...\033[0m")
@@ -444,7 +196,9 @@ reserved = {
     'break': 'BREAK',
     'try': 'TRY',
     'except': 'EXCEPT',
-    'finally': 'FINALLY'
+    'finally': 'FINALLY',
+    'async': 'ASYNC',
+    'await': 'AWAIT'
 }
 
 tokens = [
@@ -495,10 +249,9 @@ def t_IDENTIFIER(t):
 
 def t_STRING(t):
     r'\"([^\\\n]|(\\.))*?\"'
-    
-    # Remove the quotes
     val = t.value[1:-1]
-    # Replace known escape sequences
+    # Handle escaped quotes
+    val = val.replace('\\"', '"')
     val = val.encode('utf-8').decode('unicode_escape')
     t.value = val
     return t
@@ -520,10 +273,7 @@ def t_NUMBER(t):
     t.value = int(t.value)
     return t
 
-# def t_NEWLINE(t):
-#     r'\n+'
-#     t.lexer.lineno += len(t.value)
-#     return t
+
 
 def t_error(t):
     print(f"{Fore.YELLOW}[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
@@ -656,9 +406,9 @@ class Break(Node):
     pass
 
 class TryExceptFinally(Node):
-    def __init__(self, try_block, except_clauses, finally_block=None):
+    def __init__(self, try_block, except_blocks, finally_block=None):
         self.try_block = try_block
-        self.except_clauses = except_clauses
+        self.except_blocks = except_blocks
         self.finally_block = finally_block
 
 class Function:
@@ -705,6 +455,14 @@ class BuiltInFunction(Function):
 class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
+
+class Async(Node):
+    def __init__(self, body):
+        self.body = body
+
+class Await(Node):
+    def __init__(self, expression):
+        self.expression = expression
 
 # Precedence to handle unary minus
 precedence = (
@@ -774,31 +532,23 @@ def p_print_statement(p):
     p[0] = Print(String("")) if len(p) == 4 else Print(p[3])
 
 
+# Update grammar rules for try/except
 def p_try_statement(p):
-    '''try_statement : TRY block except_clauses
-                     | TRY block except_clauses FINALLY block
-                     | TRY block FINALLY block'''
+    '''try_statement : TRY block except_block
+                    | TRY block except_block FINALLY block'''
     if len(p) == 4:
         p[0] = TryExceptFinally(p[2], p[3])
-    elif len(p) == 6 and p[3] == 'FINALLY':
-        p[0] = TryExceptFinally(p[2], [], p[5])
-    elif len(p) == 6:
+    else:
         p[0] = TryExceptFinally(p[2], p[3], p[5])
-    elif len(p) == 5 and p[3] == 'FINALLY':
-        p[0] = TryExceptFinally(p[2], [], p[4])
 
-# except_clauses: one or more except clauses
-def p_except_clauses(p):
-    '''except_clauses : except_clause
-                      | except_clauses except_clause'''
-    p[0] = [p[1]] if len(p) == 2 else p[1] + [p[2]]
+def p_except_block(p):
+    '''except_block : EXCEPT IDENTIFIER block
+                   | EXCEPT block'''
+    if len(p) == 4:
+        p[0] = [('except', p[2], p[3])]
+    else:
+        p[0] = [('except', None, p[2])]
 
-def p_except_clause(p):
-    '''except_clause : EXCEPT IDENTIFIER block
-                     | EXCEPT block'''
-    # except with an identifier means catching a certain "exception type"
-    # For simplicity, we treat IDENTIFIER as the "exception name".
-    p[0] = ('except', p[2], p[3]) if len(p) == 4 else ('except', None, p[2])
 
 
 def p_if_statement(p):
@@ -1000,19 +750,41 @@ def p_empty(p):
     '''empty :'''
     p[0] = None
 
+def p_statement_async(p):
+    '''statement : ASYNC block'''
+    p[0] = Async(p[2])
+
+def p_expression_await(p):
+    '''expression : AWAIT expression'''
+    p[0] = Await(p[2])
+
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
+    return t  # Return token to keep track of line numbers
+
+# Update error reporting
 def p_error(p):
     if p:
+        line_no = p.lineno if hasattr(p, 'lineno') else 'unknown'
+        col_no = find_column(source_code, p)
         token_value = str(p.value)
-        suggestions = difflib.get_close_matches(token_value, list(reserved.keys()) + ['(', ')', '{', '}', '+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>='], n=1, cutoff=0.8)
-        error_message = f"[ERROR] Syntax error at '{token_value}' on line {p.lineno}"
-        if suggestions:
-            if token_value == "result":
-                print(f"{Fore.RED}[ERROR] 'result' is a reserved keyword and cannot be used as a variable name.")
-            else:
-                error_message += f". Did you mean '{suggestions[0]}'?"
-        print(Fore.RED + error_message)
-    else:
-        print(f"{Fore.RED}[ERROR] Syntax error at EOF")
+        
+        lines = source_code.split('\n')
+        if line_no != 'unknown' and 0 <= line_no-1 < len(lines):
+            line_content = lines[line_no-1]
+            pointer = ' ' * col_no + '^'
+            print(f"\n{Fore.RED}[ERROR] Syntax error at '{token_value}' on line {line_no}:")
+            print(line_content)
+            print(pointer)
+        else:
+            print(f"{Fore.RED}[ERROR] Syntax error at '{token_value}'")
+
+def find_column(input, token):
+    last_cr = input.rfind('\n', 0, token.lexpos)
+    if last_cr < 0:
+        last_cr = 0
+    return token.lexpos - last_cr
 
 if not args.about:
     # build parser, i think
@@ -1095,6 +867,16 @@ def execute(node, context):
         return NODE_HANDLERS[node_type](node, context)
     else:
         raise TypeError(f"Unknown node type '{node_type.__name__}'")
+    
+async def execute_async(node, context):
+    if node is None:
+        return None
+    handler = NODE_HANDLERS.get(type(node))
+    if handler:
+        if asyncio.iscoroutinefunction(handler):
+            return await handler(node, context)
+        return handler(node, context)
+    raise TypeError(f"Unknown node type: {type(node)}")
 
 def handle_program(node, context):
     for stmt in node.statements:
@@ -1144,16 +926,37 @@ def handle_boolean(node, context):
     return node.value
 
 def handle_try_except_finally(node, context):
+    result = None
     try:
-        execute(node.try_block, context)
+        result = execute(node.try_block, context)
     except Exception as e:
-        for ctype, var, block in node.except_clauses:
-            if var:
-                context.set_variable(var, str(e))
-            execute(block, context)
+        handled = False
+        for exc_type, var_name, handler_block in node.except_clauses:
+            # Handle specific exception type if specified
+            if exc_type is None or isinstance(e, eval(exc_type)):
+                if var_name:
+                    # Store exception info in context
+                    context.set_variable(var_name, {
+                        'type': type(e).__name__,
+                        'message': str(e),
+                        'string': str(e)
+                    })
+                # Execute exception handler
+                result = execute(handler_block, context)
+                handled = True
+                break
+        
+        # Re-raise if no handler matched
+        if not handled:
+            raise
     finally:
         if node.finally_block:
-            execute(node.finally_block, context)
+            finally_result = execute(node.finally_block, context)
+            # Finally block can override result if it returns a value
+            if finally_result is not None:
+                result = finally_result
+    
+    return result
 
 
 def handle_if(node, context):
@@ -1282,6 +1085,13 @@ def handle_list_literal(node, context):
 def handle_break(node, context):
     return 'break'
 
+async def handle_async(node, context):
+    return await execute_async(node.body, context)
+
+async def handle_await(node, context):
+    value = await execute_async(node.expression, context)
+    return value
+
 # Map node types to handlers
 NODE_HANDLERS = {}
 
@@ -1310,6 +1120,8 @@ NODE_HANDLERS[RangeExpression] = handle_range_expression
 NODE_HANDLERS[Break] = handle_break
 NODE_HANDLERS[ListLiteral] = handle_list_literal
 NODE_HANDLERS[TryExceptFinally] = handle_try_except_finally
+NODE_HANDLERS[Async] = handle_async
+NODE_HANDLERS[Await] = handle_await
 
 source_code = ''
 if __name__ == '__main__' and not args.init and not args.about and not args.check:
@@ -1327,7 +1139,9 @@ if __name__ == '__main__' and not args.init and not args.about and not args.chec
 
 
 global_context = ExecutionContext()
-# Math
+
+# Math utilities
+global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
 global_context.define_function('str', BuiltInFunction(str))
 global_context.define_function('int', BuiltInFunction(int))
 global_context.define_function('float', BuiltInFunction(float))
@@ -1383,20 +1197,59 @@ def read_file_func(filename):
         print(f"{Fore.RED}[ERROR] Error reading file '{filename}': {e}")
         return ''
 
+def write_file_func(filename, content):
+    try:
+        with open(str(filename), 'w') as f:
+            f.write(str(content))
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Error writing to file '{filename}': {e}")
+        return False
+
+def append_file_func(filename, content):
+    try:
+        with open(str(filename), 'a') as f:
+            f.write(str(content)) 
+            if not str(content).endswith('\n'):
+                f.write('\n')  
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Error appending to file '{filename}': {e}")
+        return False
+
 
 # File I/O
 global_context.define_function('read_file', BuiltInFunction(read_file_func))
-global_context.define_function('write_file', BuiltInFunction(lambda filename, content: (lambda: open(str(filename), 'w').write(str(content)))()))
-global_context.define_function('append_file', BuiltInFunction(lambda filename, content: (lambda f: f.write(str(content)))(open(str(filename), 'a'))))
+global_context.define_function('write_file', BuiltInFunction(write_file_func))
+global_context.define_function('append_file', BuiltInFunction(append_file_func))
+
+def normalize_code(code):
+    """Normalize code by converting semicolons to newlines while preserving existing newlines"""
+    normalized = ""
+    in_string = False
+    for i, char in enumerate(code):
+        if char == '"' and (i == 0 or code[i-1] != '\\'):
+            in_string = not in_string
+        if char == ';' and not in_string:
+            normalized += '\n'
+        else:
+            normalized += char
+    return normalized
 
 def uls_eval_func(expr):
     try:
-        # Parse the code as a 'program' to handle multiple statements
-        ast = parser.parse(expr)
-        return execute(ast, global_context)
+        normalized_code = normalize_code(str(expr))
+        ast = parser.parse(normalized_code)
+        result = execute(ast, global_context)
+        if isinstance(ast, Program) and ast.statements:
+            last_stmt = ast.statements[-1]
+            if isinstance(last_stmt, BinaryOp) or isinstance(last_stmt, Variable):
+                return execute(last_stmt, global_context)
+        return result
     except Exception as e:
         print(f"{Fore.RED}[ERROR] Error in eval: {e}")
         return None
+
 
 def python_eval_func(expr):
     return eval(expr)
@@ -1412,11 +1265,75 @@ def python_exec_func(stmt):
 global_context.define_function('python_eval', BuiltInFunction(lambda code: python_eval_func(str(code))))
 global_context.define_function('eval', BuiltInFunction(lambda code: uls_eval_func(str(code))))
 global_context.define_function('python_exec', BuiltInFunction(lambda code: python_exec_func(str(code))))
-# Math utilities
-global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
 
-# Networking
-global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
+# Update HTTP functions with better error handling
+def http_get_func(url, headers=None):
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"{Fore.RED}[ERROR] HTTP GET request failed: {e}")
+        return None
+
+
+# HTTP Methods
+global_context.define_function('http_get', BuiltInFunction(http_get_func))
+global_context.define_function('http_post', BuiltInFunction(lambda url, data=None, headers=None: 
+    requests.post(url, json=data, headers=headers, timeout=10).text))
+global_context.define_function('http_put', BuiltInFunction(lambda url, data=None, headers=None: 
+    requests.put(url, json=data, headers=headers, timeout=10).text))
+global_context.define_function('http_delete', BuiltInFunction(lambda url, headers=None: 
+    requests.delete(url, headers=headers, timeout=10).text))
+
+def handle_json_parse(text):
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        print(f"{Fore.RED}[ERROR] JSON parsing error: {e}")
+        return None
+
+# JSON handling
+global_context.define_function('parse_json', BuiltInFunction(handle_json_parse))
+global_context.define_function('to_json', BuiltInFunction(lambda obj: json.dumps(obj)))
+
+# URL operations
+global_context.define_function('parse_url', BuiltInFunction(lambda url: dict(urlparse(url)._asdict())))
+global_context.define_function('join_url', BuiltInFunction(lambda base, url: urljoin(base, url)))
+
+# Socket operations
+def create_socket_func():
+    return socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+def connect_socket_func(sock, host, port):
+    try:
+        sock.connect((host, int(port)))
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Socket connection failed: {e}")
+        return False
+
+def send_socket_func(sock, data):
+    try:
+        sock.send(str(data).encode())
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Socket send failed: {e}")
+        return False
+
+def receive_socket_func(sock, buffer_size=1024):
+    try:
+        return sock.recv(buffer_size).decode()
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Socket receive failed: {e}")
+        return ""
+
+# Socket bindings
+global_context.define_function('create_socket', BuiltInFunction(create_socket_func))
+global_context.define_function('connect_socket', BuiltInFunction(connect_socket_func))
+global_context.define_function('send_socket', BuiltInFunction(send_socket_func))
+global_context.define_function('receive_socket', BuiltInFunction(receive_socket_func))
+global_context.define_function('close_socket', BuiltInFunction(lambda sock: sock.close()))
 
 
 if not (args.init or args.about or args.check):

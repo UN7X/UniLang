@@ -66,17 +66,82 @@ define add(a, b) {
 print("add(5,7) = " + str(add(5,7)))
 
 print("=== Testing File I/O ===")
-write_file("test_output.txt", "This is a test.")
-append_file("test_output.txt", "Appended line.")
+write_file("test_output.txt", "This is a test.\n")
+append_file("test_output.txt", "Appended line.\n")
 content = read_file("test_output.txt")
 print("Content of test_output.txt:")
 print(content)
 print(" ")
-print("=== Testing eval and python_eval ===")
-print(" ")
-eval_result = eval("z = 30 + 10")
-print("eval result: " + str(eval_result))
-eval_result = eval("z = 30 z + 10")
-print("eval result: " + str(eval_result))
-print(" ")
+print("=== Testing Python Eval/Exec ===")
+print("")
+
+# Test basic python_eval
+response1 = python_eval("2 * 3 + 4")
+print("python_eval('2 * 3 + 4'): " + str(response1))
+
+# Test string operations
+response2 = python_eval("'hello'.upper()")
+print("python_eval('hello'.upper()): " + str(response2))
+
+# Test list operations
+response3 = python_eval("[1,2,3,4,5][1:4]")
+print("python_eval('[1,2,3,4,5][1:4]'): " + str(response3))
+
+# Test math functions
+response4 = python_eval("__import__('math').sqrt(16)")
+print("python_eval('math.sqrt(16)'): " + str(response4))
+
+print("")
+print("=== Testing ULS Eval ===")
+print("")
+
+# Test multi-line eval
+res1 = eval("x = 10; x + 5")
+print("eval('x = 10; x + 5'): " + str(res1))
+
+# Test variable assignment and usage
+eval("y = 20")
+res2 = eval("y * 2")
+print("eval('y * 2') after setting y=20: " + str(res2))
+
+print("")
+print("=== Testing Networking Features ===")
+print("")
+
+try {
+    response = http_get("https://api.github.com/zen")
+    print("GitHub Zen: " + str(response))
+} except error {
+    print("HTTP Request failed: " + str(error))
+} finally {
+    print("HTTP request completed")
+}
+
+# Test JSON handling
+try {
+    json_str = "{\"name\": \"John\", \"age\": 30}"
+    parsed = parse_json(json_str)
+    print("Parsed JSON: " + str(parsed))
+} except error {
+    print("JSON parsing failed: " + str(error))
+}
+
+# Test URL operations
+url = parse_url("https://example.com/path?query=value")
+print("URL parts: " + str(url))
+full_url = join_url("https://example.com", "/api/v1")
+print("Joined URL: " + str(full_url))
+
+# Test Socket operations
+print("")
+print("=== Testing Socket Operations ===")
+sock = create_socket()
+response = connect_socket(sock, "example.com", 80)
+print("Socket connection: " + str(response))
+if response {
+    send_socket(sock, "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
+    response = receive_socket(sock)
+    print("Socket response preview: " + substring(response, 0, 100))
+    close_socket(sock)
+}
 print("=== End of Tests ===")
