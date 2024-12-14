@@ -409,7 +409,7 @@ def check_for_updates():
     except Exception as e:
         print("\033[91m[ERROR] Could not check for updates.\033[0m", e)    
 
-if bool(requests.get('https://google.com').status_code == 200) and args.check:
+if requests.get('https://google.com').status_code == 200 and args.check:
     check_for_updates()
 
 if args.init:  
@@ -418,7 +418,7 @@ if args.init:
     if platform.python_implementation() != 'PyPy':
         print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for best performance.\033[0m")
 
-    
+
 if args.about:
     about()
 
@@ -448,7 +448,7 @@ reserved = {
 }
 
 tokens = [
-    'NUMBER', 'STRING', 'IDENTIFIER',
+    'NUMBER', 'STRING', 'IDENTIFIER', 
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQUALS', 'LPAREN', 'RPAREN', 'COMMA', 'SEMICOLON', 'TRIPLE_STRING',
     'LT', 'GT', 'EQ', 'NEQ', 'LE', 'GE', 'DOT', 'RBRACKET', 'LBRACKET',
@@ -483,7 +483,7 @@ t_LBRACKET = r'\['
 t_RBRACKET = r']'
 t_SEMICOLON = r';'
 t_TRIPLE_STRING = r'"""'
-t_ignore = ' \t'
+t_ignore = ' \t\r\n'
 
 def t_COMMENT(t):
     r'\#.*'
@@ -520,9 +520,10 @@ def t_NUMBER(t):
     t.value = int(t.value)
     return t
 
-def t_newline(t):
-    r'\n+'
-    t.lexer.lineno += len(t.value)
+# def t_NEWLINE(t):
+#     r'\n+'
+#     t.lexer.lineno += len(t.value)
+#     return t
 
 def t_error(t):
     print(f"{Fore.YELLOW}[WARNING] Illegal character '{t.value[0]}' at line {t.lineno}")
@@ -723,20 +724,18 @@ def p_program(p):
     p[0] = Program(p[1])
 
 def p_statement_list(p):
-    '''statement_list : statement_list separator statement
+    '''statement_list : statement_list statement
                       | statement'''
-    if len(p) == 4:
-        p[0] = p[1] + [p[3]]
-    else:
-        p[0] = [p[1]]
+    p[0] = p[1] + [p[2]] if len(p) == 3 else [p[1]]
+
+    # '''separator : NEWLINE
+    #              | SEMICOLON
+    #              | NEWLINE separator
+    #              | SEMICOLON separator'''
 
 def p_separator(p):
-    '''separator : NEWLINE
-                 | SEMICOLON
-                 | NEWLINE separator
+    '''separator : SEMICOLON
                  | SEMICOLON separator'''
-    # This rule allows multiple separators in a row. If you prefer stricter rules,
-    # just pick one. For simplicity, treat them all as valid "separators".
     pass
 
 
@@ -752,6 +751,7 @@ def p_statement(p):
                  | block
                  | expression_statement
                  | import_statement
+                 | try_statement
                  | BREAK'''
     p[0] = Break() if p.slice[1].type == 'BREAK' else p[1]
 
@@ -771,36 +771,34 @@ def p_assignment(p):
 def p_print_statement(p):
     '''print_statement : PRINT LPAREN RPAREN
                        | PRINT LPAREN expression RPAREN'''
-    if len(p) == 4:
-        # print()
-        p[0] = Print(String(""))  # Print empty line
-    else:
-        p[0] = Print(p[3])
+    p[0] = Print(String("")) if len(p) == 4 else Print(p[3])
 
 
 def p_try_statement(p):
     '''try_statement : TRY block except_clauses
                      | TRY block except_clauses FINALLY block
                      | TRY block FINALLY block'''
+    if len(p) == 4:
+        p[0] = TryExceptFinally(p[2], p[3])
+    elif len(p) == 6 and p[3] == 'FINALLY':
+        p[0] = TryExceptFinally(p[2], [], p[5])
+    elif len(p) == 6:
+        p[0] = TryExceptFinally(p[2], p[3], p[5])
+    elif len(p) == 5 and p[3] == 'FINALLY':
+        p[0] = TryExceptFinally(p[2], [], p[4])
 
 # except_clauses: one or more except clauses
 def p_except_clauses(p):
     '''except_clauses : except_clause
                       | except_clauses except_clause'''
-    if len(p) == 2:
-        p[0] = [p[1]]
-    else:
-        p[0] = p[1] + [p[2]]
+    p[0] = [p[1]] if len(p) == 2 else p[1] + [p[2]]
 
 def p_except_clause(p):
     '''except_clause : EXCEPT IDENTIFIER block
                      | EXCEPT block'''
     # except with an identifier means catching a certain "exception type"
     # For simplicity, we treat IDENTIFIER as the "exception name".
-    if len(p) == 4:
-        p[0] = ('except', p[2], p[3])
-    else:
-        p[0] = ('except', None, p[2])
+    p[0] = ('except', p[2], p[3]) if len(p) == 4 else ('except', None, p[2])
 
 
 def p_if_statement(p):
@@ -1008,7 +1006,10 @@ def p_error(p):
         suggestions = difflib.get_close_matches(token_value, list(reserved.keys()) + ['(', ')', '{', '}', '+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>='], n=1, cutoff=0.8)
         error_message = f"[ERROR] Syntax error at '{token_value}' on line {p.lineno}"
         if suggestions:
-            error_message += f". Did you mean '{suggestions[0]}'?"
+            if token_value == "result":
+                print(f"{Fore.RED}[ERROR] 'result' is a reserved keyword and cannot be used as a variable name.")
+            else:
+                error_message += f". Did you mean '{suggestions[0]}'?"
         print(Fore.RED + error_message)
     else:
         print(f"{Fore.RED}[ERROR] Syntax error at EOF")
@@ -1084,6 +1085,12 @@ def execute(node, context):
     if node is None:
         return None
     node_type = type(node)
+    if node_type == list:
+        print(f"[DEBUG] Unexpected list node: {node}")
+        # Flatten the list if necessary
+        for item in node:
+            execute(item, context)
+        return
     if node_type in NODE_HANDLERS:
         return NODE_HANDLERS[node_type](node, context)
     else:
@@ -1139,11 +1146,8 @@ def handle_boolean(node, context):
 def handle_try_except_finally(node, context):
     try:
         execute(node.try_block, context)
-    except Exception as e:  
-        # Match exception type with except_clauses (when implementing custom exceptions)
+    except Exception as e:
         for ctype, var, block in node.except_clauses:
-            # If exception matches ctype (or no ctype means catch all)
-            # define var if given
             if var:
                 context.set_variable(var, str(e))
             execute(block, context)
@@ -1371,16 +1375,28 @@ global_context.define_function('reverse', BuiltInFunction(lambda lst: lst.revers
 global_context.define_function('random_choice', BuiltInFunction(lambda lst: random.choice(lst)))
 global_context.define_function('random_shuffle', BuiltInFunction(lambda lst: random.shuffle(lst) or lst))
 
+def read_file_func(filename):
+    try:
+        with open(str(filename), 'r') as f:
+            return f.read()
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Error reading file '{filename}': {e}")
+        return ''
+
+
 # File I/O
-global_context.define_function('read_file', BuiltInFunction(lambda filename: open(str(filename), 'r').read()))
-global_context.define_function('write_file', BuiltInFunction(lambda filename, content: open(str(filename), 'w').write(str(content)) or None))
-global_context.define_function('append_file', BuiltInFunction(lambda filename, content: open(str(filename), 'a').write(str(content)) or None))
+global_context.define_function('read_file', BuiltInFunction(read_file_func))
+global_context.define_function('write_file', BuiltInFunction(lambda filename, content: (lambda: open(str(filename), 'w').write(str(content)))()))
+global_context.define_function('append_file', BuiltInFunction(lambda filename, content: (lambda f: f.write(str(content)))(open(str(filename), 'a'))))
 
-# Math utilities
-global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
-
-# Networking
-global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
+def uls_eval_func(expr):
+    try:
+        # Parse the code as a 'program' to handle multiple statements
+        ast = parser.parse(expr)
+        return execute(ast, global_context)
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Error in eval: {e}")
+        return None
 
 def python_eval_func(expr):
     return eval(expr)
@@ -1389,16 +1405,18 @@ def python_exec_func(stmt):
     env = {}
 
     exec(stmt, {}, env)
-    return env.get('result', None)
+    return env.get('result')
 
-def uls_eval_func(expr):
-    return execute(parser.parse(expr), global_context)
 
 # Code execution
 global_context.define_function('python_eval', BuiltInFunction(lambda code: python_eval_func(str(code))))
 global_context.define_function('eval', BuiltInFunction(lambda code: uls_eval_func(str(code))))
 global_context.define_function('python_exec', BuiltInFunction(lambda code: python_exec_func(str(code))))
+# Math utilities
+global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
 
+# Networking
+global_context.define_function('http_get', BuiltInFunction(lambda url: requests.get(url).text))
 
 
 if not (args.init or args.about or args.check):
