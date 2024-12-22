@@ -66,8 +66,23 @@ define add(a, b) {
 print("add(5,7) = " + str(add(5,7)))
 
 print("=== Testing File I/O ===")
-write_file("test_output.txt", "This is a test.\n")
-append_file("test_output.txt", "Appended line.\n")
+content = read_file("test_output.txt")
+if not content {
+    write_file("test_output.txt", "This is a test.\n")
+    content = read_file("test_output.txt")
+}
+num = 0
+position = 0
+
+while position >= 0 {
+    position = find(content, "Appended line.", position)
+    if position >= 0 {
+        num = num + 1
+        position = position + 1
+    }
+}
+
+append_file("test_output.txt", "Appended line." + str(num) + "\n")
 content = read_file("test_output.txt")
 print("Content of test_output.txt:")
 print(content)

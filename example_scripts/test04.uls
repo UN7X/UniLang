@@ -1,0 +1,23 @@
+print("=== Testing Async/Await ===")
+
+define async_function() {
+    wait(1)
+    result "async complete"
+}
+
+async {
+    print("Start")
+    value = await async_function()
+    print(value)
+}
+
+print("=== Testing Try/Except ===")
+
+try {
+    print("In try")
+    x = 1 / 0
+} except {
+    print("In except")
+} finally {
+    print("In finally")
+}

@@ -3,7 +3,7 @@ try:
     import pkg_resources
     from pkg_resources import DistributionNotFound
 except ModuleNotFoundError:
-        print(f"\033[93m[WARNING]Required package: ['Setuptools'] not found. Installing missing package...\033[0m")
+        print(f"\033[93m[WARNING] Required package: ['Setuptools'] not found. Installing missing package...\033[0m")
         os.system(f"{sys.executable} -m pip install setuptools")
 import time
 import random
@@ -405,11 +405,6 @@ class RangeExpression(Node):
 class Break(Node):
     pass
 
-class TryExceptFinally(Node):
-    def __init__(self, try_block, except_blocks, finally_block=None):
-        self.try_block = try_block
-        self.except_blocks = except_blocks
-        self.finally_block = finally_block
 
 class Function:
     def __init__(self, params, body):
@@ -456,13 +451,19 @@ class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
 
-class Async(Node):
+class AsyncBlock(Node):
     def __init__(self, body):
         self.body = body
 
-class Await(Node):
+class AwaitExpr(Node):
     def __init__(self, expression):
         self.expression = expression
+
+class TryExcept(Node):
+    def __init__(self, try_block, except_block, finally_block=None):
+        self.try_block = try_block
+        self.except_block = except_block
+        self.finally_block = finally_block
 
 # Precedence to handle unary minus
 precedence = (
@@ -532,22 +533,11 @@ def p_print_statement(p):
     p[0] = Print(String("")) if len(p) == 4 else Print(p[3])
 
 
-# Update grammar rules for try/except
-def p_try_statement(p):
-    '''try_statement : TRY block except_block
-                    | TRY block except_block FINALLY block'''
-    if len(p) == 4:
-        p[0] = TryExceptFinally(p[2], p[3])
-    else:
-        p[0] = TryExceptFinally(p[2], p[3], p[5])
 
 def p_except_block(p):
     '''except_block : EXCEPT IDENTIFIER block
                    | EXCEPT block'''
-    if len(p) == 4:
-        p[0] = [('except', p[2], p[3])]
-    else:
-        p[0] = [('except', None, p[2])]
+    p[0] = [('except', p[2], p[3])] if len(p) == 4 else [('except', None, p[2])]
 
 
 
@@ -751,39 +741,45 @@ def p_empty(p):
     p[0] = None
 
 def p_statement_async(p):
-    '''statement : ASYNC block'''
-    p[0] = Async(p[2])
+    '''statement : ASYNC LBRACE statement_list RBRACE'''
+    p[0] = AsyncBlock(p[3])
 
-def p_expression_await(p):
-    '''expression : AWAIT expression'''
-    p[0] = Await(p[2])
+def p_statement_await(p):
+    '''statement : AWAIT expression'''
+    p[0] = AwaitExpr(p[2])
+
+def p_statement_try(p):
+    '''statement : TRY LBRACE statement_list RBRACE EXCEPT LBRACE statement_list RBRACE
+                | TRY LBRACE statement_list RBRACE EXCEPT LBRACE statement_list RBRACE FINALLY LBRACE statement_list RBRACE'''
+    if len(p) == 9:
+        p[0] = TryExcept(p[3], p[7])
+    else:
+        p[0] = TryExcept(p[3], p[7], p[11])
 
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
     return t  # Return token to keep track of line numbers
 
-# Update error reporting
 def p_error(p):
     if p:
         line_no = p.lineno if hasattr(p, 'lineno') else 'unknown'
-        col_no = find_column(source_code, p)
-        token_value = str(p.value)
+        col_no = find_column(source_code, p) if p else 0
+        token_value = str(p.value) if p else ''
         
-        lines = source_code.split('\n')
+        lines = source_code.splitlines()
         if line_no != 'unknown' and 0 <= line_no-1 < len(lines):
-            line_content = lines[line_no-1]
+            line_content = lines[line_no-1].rstrip()
             pointer = ' ' * col_no + '^'
             print(f"\n{Fore.RED}[ERROR] Syntax error at '{token_value}' on line {line_no}:")
             print(line_content)
-            print(pointer)
+            print(pointer + f"{Style.RESET_ALL}")
         else:
-            print(f"{Fore.RED}[ERROR] Syntax error at '{token_value}'")
+            print(f"{Fore.RED}[ERROR] Syntax error at '{token_value}'{Style.RESET_ALL}")
 
 def find_column(input, token):
     last_cr = input.rfind('\n', 0, token.lexpos)
-    if last_cr < 0:
-        last_cr = 0
+    last_cr = max(last_cr, 0)
     return token.lexpos - last_cr
 
 if not args.about:
@@ -871,8 +867,7 @@ def execute(node, context):
 async def execute_async(node, context):
     if node is None:
         return None
-    handler = NODE_HANDLERS.get(type(node))
-    if handler:
+    if handler := NODE_HANDLERS.get(type(node)):
         if asyncio.iscoroutinefunction(handler):
             return await handler(node, context)
         return handler(node, context)
@@ -1085,12 +1080,25 @@ def handle_list_literal(node, context):
 def handle_break(node, context):
     return 'break'
 
-async def handle_async(node, context):
+async def handle_async_block(node, context):
     return await execute_async(node.body, context)
 
-async def handle_await(node, context):
+async def handle_await_expr(node, context):
     value = await execute_async(node.expression, context)
     return value
+
+def handle_try_except(node, context):
+    try:
+        return execute(node.try_block, context)
+    except Exception as e:
+        if node.except_block:
+            return execute(node.except_block, context)
+        raise
+    finally:
+        if node.finally_block:
+            execute(node.finally_block, context)
+
+
 
 # Map node types to handlers
 NODE_HANDLERS = {}
@@ -1119,9 +1127,9 @@ NODE_HANDLERS[While] = handle_while
 NODE_HANDLERS[RangeExpression] = handle_range_expression
 NODE_HANDLERS[Break] = handle_break
 NODE_HANDLERS[ListLiteral] = handle_list_literal
-NODE_HANDLERS[TryExceptFinally] = handle_try_except_finally
-NODE_HANDLERS[Async] = handle_async
-NODE_HANDLERS[Await] = handle_await
+NODE_HANDLERS[AsyncBlock] = handle_async_block
+NODE_HANDLERS[AwaitExpr] = handle_await_expr
+NODE_HANDLERS[TryExcept] = handle_try_except
 
 source_code = ''
 if __name__ == '__main__' and not args.init and not args.about and not args.check:
@@ -1168,7 +1176,7 @@ global_context.define_function('randomint', BuiltInFunction(lambda min_val, max_
 # String utilities
 global_context.define_function('length', BuiltInFunction(lambda s: len(str(s))))
 global_context.define_function('substring', BuiltInFunction(lambda s, start, end: str(s)[int(start):int(end)]))
-global_context.define_function('find', BuiltInFunction(lambda s, sub: str(s).find(str(sub))))
+global_context.define_function('find', BuiltInFunction(lambda s, sub, pos=0: str(s).find(str(sub), int(pos))))
 global_context.define_function('split', BuiltInFunction(lambda s, delim=' ': str(s).split(str(delim))))
 global_context.define_function('join', BuiltInFunction(lambda delim, lst: str(delim).join(str(x) for x in lst)))
 global_context.define_function('replace', BuiltInFunction(lambda s, old, new: str(s).replace(str(old), str(new))))
@@ -1216,7 +1224,6 @@ def append_file_func(filename, content):
     except Exception as e:
         print(f"{Fore.RED}[ERROR] Error appending to file '{filename}': {e}")
         return False
-
 
 # File I/O
 global_context.define_function('read_file', BuiltInFunction(read_file_func))
