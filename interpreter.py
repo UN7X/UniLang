@@ -287,16 +287,18 @@ def t_IDENTIFIER(t):
     return t
 
 def t_STRING(t):
-    r'\"([^\\\n]|(\\.))*?\"'
-    val = t.value[1:-1]
-    # Handle escaped quotes
-    val = val.replace('\\"', '"')
-    val = val.encode('utf-8').decode('unicode_escape')
-    t.value = val
+    r"(\"([^\\\n]|(\\.))*?\")|('([^\\\n]|(\\.))*?')"
+    if t.value[0] == '"':
+        # Remove surrounding quotes and unescape inner double quotes.
+        val = t.value[1:-1].replace('\\"', '"')
+    else:
+        # Remove surrounding quotes and unescape inner single quotes.
+        val = t.value[1:-1].replace("\\'", "'")
+    t.value = val.encode('utf-8').decode('unicode_escape')
     return t
 
 def t_MULTILINE_STRING(t):
-    r'"""([^"\\]|\\.|"(?!""))*"""'
+    r'"""([\s\S]*?)"""'
     # This regex matches a triple-quoted string, allowing \" inside.
     # Extract the content without the triple quotes:
     val = t.value[3:-3]
@@ -801,10 +803,10 @@ def t_newline(t):
 def p_error(p):
     if p:
         line_no = p.lineno if hasattr(p, 'lineno') else 'unknown'
-        col_no = find_column(source_code, p) if p else 0
+        col_no = find_column(p.lexer.lexdata, p) if p else 0
         token_value = str(p.value) if p else ''
         
-        lines = source_code.splitlines()
+        lines = p.lexer.lexdata.splitlines()
         if line_no != 'unknown' and 0 <= line_no-1 < len(lines):
             line_content = lines[line_no-1].rstrip()
             pointer = ' ' * col_no + '^'
@@ -818,6 +820,11 @@ def find_column(input, token):
     last_cr = input.rfind('\n', 0, token.lexpos)
     last_cr = max(last_cr, 0)
     return token.lexpos - last_cr
+
+# Python
+def p_await_expression(p):
+    '''expression : AWAIT expression'''
+    p[0] = AwaitExpr(p[2])
 
 if not args.about:
     # build parser, i think
@@ -1150,34 +1157,20 @@ def handle_list_literal(node, context):
 def handle_break(node, context):
     return 'break'
 
-async def handle_async_block(node, context):
-    return await execute_async(node.body, context)
+def handle_async_block(node, context):
+    return asyncio.run(execute(node.body, context))
 
-async def handle_await_expr(node, context):
-    value = await execute_async(node.expression, context)
-    return value
+def handle_await_expr(node, context):
+    return asyncio.run(execute(node.expression, context))
 
 def handle_try_except(node, context):
     try:
-        return execute(node.try_block, context)
-    except Exception as e:
-        if node.except_block:
-            if args.debug:
-                print(f"[DEBUG] Caught exception in try block: {type(e).__name__}: {e}")
-            return execute(node.except_block, context)
-        else:
-            raise  # Re-raise if no except block
+        result = execute(node.try_block, context)
+    except Exception:
+        result = execute(node.except_block, context)
     finally:
-        if node.finally_block:
-            try:
-                finally_result = execute(node.finally_block, context)
-                if finally_result is not None:
-                    result = finally_result
-            except Exception as e:
-                if args.debug:
-                    print(f"[DEBUG] Error in finally block: {e}")
-                raise
-    
+        if node.finally_block is not None:
+            execute(node.finally_block, context)
     return result
 
 

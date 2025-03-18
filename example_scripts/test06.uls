@@ -1,1 +1,3 @@
-python_exec("exec("""import os; os.system("echo hello")""", globals())")
+import os
+
+os.system("echo hello world")
