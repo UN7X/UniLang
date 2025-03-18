@@ -1,25 +1,37 @@
+current_version = "1.1.3"
+release_channel = "Canarary"
+
+# Import modules in organized groups
+# Standard library imports
+import asyncio
+import datetime
+import json
+import math
+import os
+import platform
+import random
+import re
+import socket
 import subprocess
+import sys
+import time
+from os import path
+from urllib.parse import urlparse, urljoin
+
+# Try to import third-party packages
 try:
     import pkg_resources
     from pkg_resources import DistributionNotFound
 except ModuleNotFoundError:
-        print(f"\033[93m[WARNING] Required package: ['Setuptools'] not found. Installing missing package...\033[0m")
-        os.system(f"{sys.executable} -m pip install setuptools")
-import time
-import random
-import re
-import math
+    print(f"\033[93m[WARNING] Required package: ['Setuptools'] not found. Installing missing package...\033[0m")
+    os.system(f"{sys.executable} -m pip install setuptools")
+    import pkg_resources
+    from pkg_resources import DistributionNotFound
+
+# Parse arguments early to know if we need to initialize
 import argparse
-import difflib
-import os
-from os import path
-import platform
-import sys
-import datetime
-import json
-from urllib.parse import urlparse, urljoin
-import socket
-import asyncio
+
+# Import manual first to fail fast if it's missing
 try:
     from manual import manual_pages
 except ImportError:
@@ -31,9 +43,9 @@ try:
     parser_arg.add_argument('script', nargs="?", help='Path to the UniLang script file')
     parser_arg.add_argument('--fo', action='store_true', help='Fail open on syntax errors')
     parser_arg.add_argument('--fc', action='store_true', help='Fail close on syntax errors')
-    parser_arg.add_argument('--init', action='store_true', help='Prapare and ensure the interpreter is ready for first use.')
+    parser_arg.add_argument('--init', action='store_true', help='Prepare and ensure the interpreter is ready for first use.')
     parser_arg.add_argument('--about', action='store_true', help='Show information about the interpreter.')
-    parser_arg.add_argument('--version', action='version', version='%(prog)s 1.0.0')
+    parser_arg.add_argument('--version', action='version', version=f'%(prog)s {current_version}')  # Use current_version
     parser_arg.add_argument('--man', nargs='?', const='1', help='Show the ULS manual. Provide a page number optionally.')
     parser_arg.add_argument('--debug', action='store_true', help='Enable debug mode.')
     parser_arg.add_argument('--check', action='store_true', help='Check for updates.')  
@@ -55,6 +67,44 @@ if args.man:
         print(f"No manual page {page_number}. Available pages: 1-{len(manual_pages)}")
     sys.exit(0)
 
+# Define required packages
+required_packages = ['ply', 'colorama', 'requests', 'aiohttp']
+
+# Check for required packages
+def check_required_packages():
+    missing_packages = []
+    for package in required_packages:
+        try:
+            pkg_resources.get_distribution(package)
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            missing_packages.append(package)
+    return missing_packages
+
+# Install required packages if needed
+def install_packages():
+    missing = check_required_packages()
+    if missing:
+        print(f"\033[93m[WARNING] Required package(s): {missing} not found. Installing missing package(s)...\033[0m")
+        for package in missing:
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+                print(f"\033[36m[INFO] {package} installed successfully.\033[0m")
+            except subprocess.CalledProcessError:
+                print(f"\033[91m[ERROR] Failed to install {package}.\033[0m")
+                return False
+    return True
+
+# Handle package installation
+if args.init or check_required_packages():
+    if not args.init and check_required_packages():
+        print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
+        exit(1)
+        
+    if args.init:
+        print("\033[36m[INFO] Initializing interpreter...\033[0m")
+        install_packages()
+
+# Import third-party packages now that we've ensured they're installed
 try: 
     import ply.lex as lex
     import ply.yacc as yacc
@@ -62,43 +112,24 @@ try:
     init(autoreset=True)
     import requests
     from requests.exceptions import RequestException
-    import sys
     import aiohttp
-except ImportError or ModuleNotFoundError:
-    if not args.init:
-        print("Required packages not found. Please run the interpreter with the --init flag to install the required packages.")
-        exit(1)
-    def is_setuptools_installed():
-        return any(os.path.isdir(os.path.join(path, 'setuptools')) for path in sys.path)
+except ImportError as e:
+    print(f"Failed to import required packages: {e}")
+    print("Please run the interpreter with the --init flag to install the required packages.")
+    exit(1)
 
-    if not is_setuptools_installed():
-        print("setuptools not found. Installing...")
-        os.system(f"{sys.executable} -m pip install setuptools")
-
-
-    try:
-        pkg_resources.get_distribution('ply')
-        print("\033[36m[INFO] ply is already installed.\033[0m")
-        pkg_resources.get_distribution('colorama')
-        print("\033[36m[INFO] colorama is already installed.\033[0m")
-        pkg_resources.get_distribution('requests')
-        print("\033[36m[INFO] requests is already installed.\033[0m")
-        pkg_resources.get_distribution('aiohttp')
-        print("\033[36m[INFO] aiohttp is already installed.\033[0m")
-    except pkg_resources.DistributionNotFound as e:
-        missing_packages = [str(e).split("'")[1]]
-        print(f"\033[93m[WARNING]Required package(s): {missing_packages} not found. Installing missing package(s)...\033[0m")
-
-        for package in missing_packages:
-            subprocess.call([sys.executable, "-m", "pip", "install", package])
-            
-
-
+# Validate script argument
 if not args.init and not args.about and not args.script and not args.check:
     parser_arg.error("the following arguments are required: script")
 
-current_version = "1.1.3"
-
+def getOnlineStatus():
+    """Check internet connection with timeout to avoid hanging"""
+    try:
+        response = requests.get('https://google.com', timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+    
 def about():
     print(f"""
 \033[36mUni\033[97;46mLang\033[0m | \033[107;30mScript Interpreter\033[0m
@@ -109,12 +140,13 @@ by UN7X
  \ \_____\  \ \_____\  \/\_____\  \ \_\ 
   \/_____/   \/_____/   \/_____/   \/_/ 
 """)
-    labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Architecture:", "Python Version:", "Type:",]
+    labels = ["Date:", "Connected to Internet:", "Interpreter path:", "UniLang Version:", "UniLang Release Channel", "Operating System:", "OS Version:", "Machine Name:", "Processor:", "Architecture:", "Python Version:", "Python Type:",]
     values = [
         time.strftime('%Y-%m-%d %H:%M:%S'),
-        str(requests.get('https://google.com').status_code == 200),
+        str(getOnlineStatus()),
         os.path.abspath(__file__),
         current_version,
+        release_channel,
         platform.system(),
         platform.version(),
         platform.machine(),
@@ -139,41 +171,48 @@ The goal of \033[36mUni\033[97;46mLang\033[0m is to provide a simple and fun way
     print("For more info, please visit https://un7x.net/unilang-script\n")
     exit(0)
 
-def check_and_install_package(package_names):
-    for package_name in package_names:
-        try:
-            pkg_resources.get_distribution(package_name)
-            print(f"{package_name} is already installed.")
-        except DistributionNotFound:
-            print(f"{package_name} not found. Installing...")
-            subprocess.call(['pip', 'install', package_name])
-    return True
+# Improved update checker with timeout and error handling
 GITHUB_API_URL = 'https://api.github.com/repos/UN7X/unilang/releases/latest'
 
 def check_for_updates():
-    try:
-        response = requests.get(GITHUB_API_URL)
-        latest_release = response.json()['name']
-        if current_version < latest_release:
-            print(f"\033[93m[WARNING] A newer version ({latest_release}) is available. Please update for best stability.\033[0m")
-        else:
-            print("\033[92m[INFO] You are using the latest ULSI version.\033[0m")
-    except Exception as e:
-        print("\033[91m[ERROR] Could not check for updates.\033[0m", e)    
+    """Check for updates with proper error handling and timeout"""
+    if getOnlineStatus():
+        try:
+            response = requests.get(GITHUB_API_URL, timeout=10)
+            response.raise_for_status()  # Handle HTTP errors properly
+            latest_release = response.json().get('name', '')
+            
+            if not latest_release:
+                print("\033[93m[WARNING] Could not determine latest version.\033[0m")
+                return
+                
+            if current_version < latest_release:
+                print(f"\033[93m[WARNING] A newer version ({latest_release}) is available. Please update for best stability.\033[0m")
+            else:
+                print("\033[92m[INFO] You are using the latest ULSI version.\033[0m")
+        except requests.RequestException as e:
+            print(f"\033[91m[ERROR] Could not check for updates: {e}\033[0m")
+        except (ValueError, KeyError) as e:
+            print(f"\033[91m[ERROR] Invalid response from update server: {e}\033[0m")
+        except Exception as e:
+            print(f"\033[91m[ERROR] Unexpected error checking for updates: {e}\033[0m")
 
-if requests.get('https://google.com').status_code == 200 and args.check:
+# Run checks
+if not args.about:  # Don't check updates if showing about page
     check_for_updates()
 
-if args.init:  
-    check_for_updates()
+# Initialize if requested
+if args.init:
     print("\033[36m[INFO] Initializing interpreter...\033[0m")
     if platform.python_implementation() != 'PyPy':
         print("\033[93m[WARNING] PyPy interpreter not detected. It is recommended to use PyPy for best performance.\033[0m")
+    print("\033[32m[SUCCESS] Interpreter initialization complete!\033[0m")
+    exit(0)
 
-
+# Show about page if requested
 if args.about:
     about()
-
+    
 # ---------------- LEXER -----------------
 
 reserved = {
@@ -261,7 +300,7 @@ def t_MULTILINE_STRING(t):
     # This regex matches a triple-quoted string, allowing \" inside.
     # Extract the content without the triple quotes:
     val = t.value[3:-3]
-    # Decode escapes if desired:
+    # Decode escapes 
     val = val.encode('utf-8').decode('unicode_escape')
     t.type = 'STRING'
     t.value = val
@@ -665,7 +704,6 @@ def p_primary(p):
         # primary LPAREN RPAREN
         p[0] = FunctionCall(p[1], [])
 
-
 def p_arg_list(p):
     '''arg_list : expression
                 | arg_list COMMA expression
@@ -718,7 +756,6 @@ def p_item_list(p):
         p[0] = [p[1]]
     else:
         p[0] = p[1] + [p[3]]
-
 
 def p_expression_increment(p):
     '''expression : expression INCREMENT
@@ -852,33 +889,67 @@ class ReturnException(Exception):
 def execute(node, context):
     if node is None:
         return None
+    
     node_type = type(node)
+    
     if node_type == list:
-        print(f"[DEBUG] Unexpected list node: {node}")
-        # Flatten the list if necessary
+        if args.debug:
+            print(f"[DEBUG] Processing list node with {len(node)} items")
+            
+        # Execute each item in the list more efficiently
+        result = None
         for item in node:
-            execute(item, context)
-        return
-    if node_type in NODE_HANDLERS:
-        return NODE_HANDLERS[node_type](node, context)
-    else:
+            result = execute(item, context)
+            if result == 'break':
+                return 'break'
+        return result
+    
+    # More efficient handler lookup with proper error messaging
+    handler = NODE_HANDLERS.get(node_type)
+    if handler is None:
         raise TypeError(f"Unknown node type '{node_type.__name__}'")
     
+    try:
+        return handler(node, context)
+    except ReturnException:
+        # Let ReturnException propagate up to function handlers
+        raise
+    except Exception as e:
+        if args.debug:
+            print(f"[DEBUG] Error executing {node_type.__name__}: {e}")
+        raise
+    
+# Improved async execution
 async def execute_async(node, context):
+    """Execute nodes asynchronously with better error handling"""
     if node is None:
         return None
-    if handler := NODE_HANDLERS.get(type(node)):
+    
+    handler = NODE_HANDLERS.get(type(node))
+    if handler is None:
+        raise TypeError(f"Unknown node type: {type(node).__name__}")
+    
+    try:
         if asyncio.iscoroutinefunction(handler):
             return await handler(node, context)
         return handler(node, context)
-    raise TypeError(f"Unknown node type: {type(node)}")
+    except Exception as e:
+        if args.debug:
+            print(f"[DEBUG] Error in async execution: {e}")
+        raise
 
 def handle_program(node, context):
+    """Execute program node with better handling of breaks"""
     for stmt in node.statements:
-        val = execute(stmt, context)
-        # If a break is encountered at top-level, it just stops executing further statements
-        if val == 'break':
-            break
+        try:
+            val = execute(stmt, context)
+# If a break is encountered at top-level, it just stops executing further statements
+            if val == 'break':
+                break
+        except Exception as e:
+            if args.debug:
+                print(f"[DEBUG] Error in statement: {e}")
+            raise
     return None
 
 def handle_import(node, context):
@@ -952,7 +1023,6 @@ def handle_try_except_finally(node, context):
                 result = finally_result
     
     return result
-
 
 def handle_if(node, context):
     if condition := execute(node.condition, context):
@@ -1092,18 +1162,27 @@ def handle_try_except(node, context):
         return execute(node.try_block, context)
     except Exception as e:
         if node.except_block:
+            if args.debug:
+                print(f"[DEBUG] Caught exception in try block: {type(e).__name__}: {e}")
             return execute(node.except_block, context)
-        raise
+        else:
+            raise  # Re-raise if no except block
     finally:
         if node.finally_block:
-            execute(node.finally_block, context)
+            try:
+                finally_result = execute(node.finally_block, context)
+                if finally_result is not None:
+                    result = finally_result
+            except Exception as e:
+                if args.debug:
+                    print(f"[DEBUG] Error in finally block: {e}")
+                raise
+    
+    return result
 
 
-
-# Map node types to handlers
 NODE_HANDLERS = {}
 
-# Register handlers
 NODE_HANDLERS[Program] = handle_program
 NODE_HANDLERS[Import] = handle_import
 NODE_HANDLERS[Block] = handle_block
@@ -1133,22 +1212,44 @@ NODE_HANDLERS[TryExcept] = handle_try_except
 
 source_code = ''
 if __name__ == '__main__' and not args.init and not args.about and not args.check:
-    with open(args.script, 'r') as f:
-        source_code = f.read()
+    # File operations with proper encoding and error handling
+    try:
+        with open(args.script, 'r', encoding='utf-8') as f:
+            source_code = f.read()
+    except FileNotFoundError:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Script file not found: {args.script}")
+        exit(1)
+    except PermissionError:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Permission denied when reading file: {args.script}")
+        exit(1)
+    except UnicodeDecodeError:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Unable to decode file. Please ensure it uses UTF-8 encoding.")
+        exit(1)
+    except Exception as e:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Error reading file: {e}")
+        exit(1)
 
-    # Parse the source code
+    # Parse the source code with better error handling
     try:
         ast = parser.parse(source_code)
+        if ast is None:
+            print(f"{Fore.LIGHTRED_EX}[FATAL] Parsing failed with no specific error.")
+            if args.fc:
+                exit(1)
     except SyntaxError as e:
         print(f"{Fore.LIGHTRED_EX}[FATAL] {e}")
         if args.fc:
             exit(1)
+    except Exception as e:
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Parse error: {e}")
+        if args.fc:
+            exit(1)
 
+    
 
-
-global_context = ExecutionContext()
-
-# Math utilities
+    global_context = ExecutionContext()
+    
+    # Math utilities
 global_context.define_function('sqrt', BuiltInFunction(lambda x: math.sqrt(float(x))))
 global_context.define_function('str', BuiltInFunction(str))
 global_context.define_function('int', BuiltInFunction(int))
@@ -1203,7 +1304,7 @@ def read_file_func(filename):
             return f.read()
     except Exception as e:
         print(f"{Fore.RED}[ERROR] Error reading file '{filename}': {e}")
-        return ''
+    return ''
 
 def write_file_func(filename, content):
     try:
@@ -1257,7 +1358,6 @@ def uls_eval_func(expr):
         print(f"{Fore.RED}[ERROR] Error in eval: {e}")
         return None
 
-
 def python_eval_func(expr):
     return eval(expr)
 
@@ -1270,19 +1370,19 @@ def python_exec_func(stmt):
 
 # Code execution
 global_context.define_function('python_eval', BuiltInFunction(lambda code: python_eval_func(str(code))))
-global_context.define_function('eval', BuiltInFunction(lambda code: uls_eval_func(str(code))))
 global_context.define_function('python_exec', BuiltInFunction(lambda code: python_exec_func(str(code))))
 
 # Update HTTP functions with better error handling
 def http_get_func(url, headers=None):
+    """Make HTTP GET request with better error handling"""
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.text
-    except requests.RequestException as e:
-        print(f"{Fore.RED}[ERROR] HTTP GET request failed: {e}")
+    except requests.ConnectionError:
+        print(f"{Fore.RED}[ERROR] Connection error while accessing {url}")
         return None
-
+        
 
 # HTTP Methods
 global_context.define_function('http_get', BuiltInFunction(http_get_func))
@@ -1299,7 +1399,7 @@ def handle_json_parse(text):
     except json.JSONDecodeError as e:
         print(f"{Fore.RED}[ERROR] JSON parsing error: {e}")
         return None
-
+        
 # JSON handling
 global_context.define_function('parse_json', BuiltInFunction(handle_json_parse))
 global_context.define_function('to_json', BuiltInFunction(lambda obj: json.dumps(obj)))
@@ -1342,10 +1442,24 @@ global_context.define_function('send_socket', BuiltInFunction(send_socket_func))
 global_context.define_function('receive_socket', BuiltInFunction(receive_socket_func))
 global_context.define_function('close_socket', BuiltInFunction(lambda sock: sock.close()))
 
+# Add Python builtins to global context for advanced usage
+import builtins
+for name in dir(builtins):
+    if not name.startswith('__'):
+        attr = getattr(builtins, name)
+        if callable(attr):
+            global_context.define_function(name, BuiltInFunction(attr))
+        else:
+            global_context.variables[name] = attr
 
 if not (args.init or args.about or args.check):
     # Execute the parsed AST
     try:
         execute(ast, global_context)
+    except KeyboardInterrupt:
+        print(f"{Fore.YELLOW}[INFO] Program interrupted by user.")
     except Exception as e:
-        print(f"{Fore.LIGHTRED_EX}[FATAL] {e}")
+        print(f"{Fore.LIGHTRED_EX}[FATAL] Runtime error: {e}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()

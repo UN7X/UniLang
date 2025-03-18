@@ -1,3 +1,6 @@
 This is a test.
 Appended line.0
 Appended line.1
+Appended line.2
+Appended line.3
+Appended line.4
